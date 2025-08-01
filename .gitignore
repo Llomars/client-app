@@ -39,3 +39,4 @@ yarn-error.*
 *.tsbuildinfo
 
 app-example
+admin-dashboard/botaik-app-firebase-adminsdk-fbsvc-deff27d894.json
