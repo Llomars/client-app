@@ -1,0 +1,79 @@
+[debug] [2025-07-10T10:05:51.685Z] ----------------------------------------------------------------------
+[debug] [2025-07-10T10:05:51.687Z] Command:       /usr/local/bin/node /usr/local/bin/firebase functions:shell
+[debug] [2025-07-10T10:05:51.687Z] CLI Version:   14.9.0
+[debug] [2025-07-10T10:05:51.687Z] Platform:      darwin
+[debug] [2025-07-10T10:05:51.687Z] Node Version:  v22.16.0
+[debug] [2025-07-10T10:05:51.687Z] Time:          Thu Jul 10 2025 14:05:51 GMT+0400 (Réunion Time)
+[debug] [2025-07-10T10:05:51.687Z] ----------------------------------------------------------------------
+[debug] 
+[debug] [2025-07-10T10:05:51.688Z] >>> [apiv2][query] GET https://firebase-public.firebaseio.com/cli.json [none]
+[debug] [2025-07-10T10:05:51.824Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2025-07-10T10:05:51.825Z] > authorizing via signed-in user (nonalspark@gmail.com)
+[debug] [2025-07-10T10:05:51.825Z] [iam] checking project botaik-app for permissions ["firebase.projects.get"]
+[debug] [2025-07-10T10:05:51.825Z] Checked if tokens are valid: false, expires at: 1751983807050
+[debug] [2025-07-10T10:05:51.825Z] Checked if tokens are valid: false, expires at: 1751983807050
+[debug] [2025-07-10T10:05:51.825Z] > refreshing access token with scopes: []
+[debug] [2025-07-10T10:05:51.826Z] >>> [apiv2][query] POST https://www.googleapis.com/oauth2/v3/token [none]
+[debug] [2025-07-10T10:05:51.826Z] >>> [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-07-10T10:05:52.359Z] <<< [apiv2][status] POST https://www.googleapis.com/oauth2/v3/token 200
+[debug] [2025-07-10T10:05:52.360Z] <<< [apiv2][body] POST https://www.googleapis.com/oauth2/v3/token [omitted]
+[debug] [2025-07-10T10:05:52.366Z] >>> [apiv2][query] POST https://cloudresourcemanager.googleapis.com/v1/projects/botaik-app:testIamPermissions [none]
+[debug] [2025-07-10T10:05:52.366Z] >>> [apiv2][(partial)header] POST https://cloudresourcemanager.googleapis.com/v1/projects/botaik-app:testIamPermissions x-goog-quota-user=projects/botaik-app
+[debug] [2025-07-10T10:05:52.366Z] >>> [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/botaik-app:testIamPermissions {"permissions":["firebase.projects.get"]}
+[debug] [2025-07-10T10:05:52.565Z] <<< [apiv2][status] GET https://firebase-public.firebaseio.com/cli.json 200
+[debug] [2025-07-10T10:05:52.565Z] <<< [apiv2][body] GET https://firebase-public.firebaseio.com/cli.json {"cloudBuildErrorAfter":1594252800000,"cloudBuildWarnAfter":1590019200000,"defaultNode10After":1594252800000,"minVersion":"3.0.5","node8DeploysDisabledAfter":1613390400000,"node8RuntimeDisabledAfter":1615809600000,"node8WarnAfter":1600128000000}
+[debug] [2025-07-10T10:05:54.372Z] <<< [apiv2][status] POST https://cloudresourcemanager.googleapis.com/v1/projects/botaik-app:testIamPermissions 200
+[debug] [2025-07-10T10:05:54.372Z] <<< [apiv2][body] POST https://cloudresourcemanager.googleapis.com/v1/projects/botaik-app:testIamPermissions {"permissions":["firebase.projects.get"]}
+[warn] ⚠  functions: Functions Emulator unable to start on port 5000, starting on 5001 instead. {"metadata":{"emulator":{"name":"functions"},"message":"Functions Emulator unable to start on port 5000, starting on 5001 instead."}}
+[debug] [2025-07-10T10:05:54.443Z] [functions] Functions Emulator only supports listening on one address (127.0.0.1). Not listening on ::1
+[debug] [2025-07-10T10:05:54.457Z] defaultcredentials: writing to file /Users/nolandemars/.config/firebase/nonalspark_gmail_com_application_default_credentials.json
+[debug] [2025-07-10T10:05:54.458Z] DEBUG: Setting GAC to /Users/nolandemars/.config/firebase/nonalspark_gmail_com_application_default_credentials.json
+[debug] [2025-07-10T10:05:54.458Z] Checked if tokens are valid: true, expires at: 1752145551360
+[debug] [2025-07-10T10:05:54.458Z] Checked if tokens are valid: true, expires at: 1752145551360
+[debug] [2025-07-10T10:05:54.458Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects/botaik-app/adminSdkConfig [none]
+[debug] [2025-07-10T10:05:55.346Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects/botaik-app/adminSdkConfig 200
+[debug] [2025-07-10T10:05:55.346Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects/botaik-app/adminSdkConfig {"projectId":"botaik-app","databaseURL":"https://botaik-app-default-rtdb.firebaseio.com","storageBucket":"botaik-app.firebasestorage.app"}
+[debug] [2025-07-10T10:05:55.357Z] [functions] Watching "/Users/nolandemars/client-app/functions" for Cloud Functions...
+[debug] [2025-07-10T10:05:55.360Z] Validating nodejs source
+[debug] [2025-07-10T10:05:57.225Z] > [functions] package.json contents: {
+  "name": "functions",
+  "description": "Cloud Functions for Firebase",
+  "scripts": {
+    "lint": "eslint .",
+    "serve": "firebase emulators:start --only functions",
+    "shell": "firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log",
+    "pvgis-proxy": "node pvgis-proxy.js"
+  },
+  "engines": {
+    "node": "22"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^6.3.2",
+    "node-fetch": "^2.7.0"
+  },
+  "devDependencies": {
+    "eslint": "^8.15.0",
+    "eslint-config-google": "^0.14.0",
+    "firebase-functions-test": "^3.1.0"
+  },
+  "private": true
+}
+[debug] [2025-07-10T10:05:57.225Z] Building nodejs source
+[debug] [2025-07-10T10:05:57.225Z] Failed to find version of module node: reached end of search path /Users/nolandemars/client-app/functions/node_modules
+[info] ✔  functions: Using node@22 from host. 
+[debug] [2025-07-10T10:05:57.227Z] Could not find functions.yaml. Must use http discovery
+[debug] [2025-07-10T10:05:57.232Z] Found firebase-functions binary at '/Users/nolandemars/client-app/functions/node_modules/.bin/firebase-functions'
+[info] Serving at port 8328
+
+[debug] [2025-07-10T10:05:57.531Z] Got response from /__/functions.yaml {"endpoints":{"listUsers":{"availableMemoryMb":null,"timeoutSeconds":null,"minInstances":null,"maxInstances":10,"ingressSettings":null,"concurrency":null,"serviceAccountEmail":null,"vpc":null,"platform":"gcfv2","labels":{},"httpsTrigger":{},"entryPoint":"listUsers"}},"specVersion":"v1alpha1","requiredAPIs":[],"extensions":{}}
+[debug] [2025-07-10T10:06:01.554Z] [functions] Loaded functions definitions from source: listUsers.
+[debug] [2025-07-10T10:06:01.554Z] [functions[us-central1-listUsers]] http function initialized (http://127.0.0.1:5001/botaik-app/us-central1/listUsers).
+[info] i  functions: Loaded functions: listUsers 
+[warn] ⚠  functions: The following emulators are not running, calls to these services will affect production: firestore, database, pubsub, storage, eventarc, tasks 

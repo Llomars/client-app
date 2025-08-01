@@ -1,6 +1,6 @@
 import { Ionicons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
 import {
   Dimensions,
   ScrollView,
@@ -9,19 +9,15 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-
-import {
-  VictoryAxis,
-  VictoryBar,
-  VictoryChart,
-  VictoryGroup,
-  VictoryLegend,
-} from "victory-native"; // ✅ pas "victory"
+import { LineChart } from "react-native-chart-kit";
+import useDynamicTheme from "../utils/useDynamicTheme"; // ✅ Ton hook dynamique
 
 export default function DataSolar() {
   const router = useRouter();
+  const { theme, isDark, isTwilight } = useDynamicTheme(); // ✅ Hook appelé
   const screenWidth = Dimensions.get("window").width;
 
+  // === DATA ===
   const months = [
     { month: "Janvier", consumption: 300 },
     { month: "Février", consumption: 350 },
@@ -30,7 +26,7 @@ export default function DataSolar() {
     { month: "Mai", consumption: 600 },
     { month: "Juin", consumption: 700 },
   ].map((m) => {
-    const extra = Math.floor(m.consumption * (0.05 + Math.random() * 0.25));
+    const extra = Math.floor(m.consumption * (0.1 + Math.random() * 0.3));
     return {
       ...m,
       surplus: extra,
@@ -38,139 +34,203 @@ export default function DataSolar() {
     };
   });
 
-  const edfPricePerKwh = 0.150425;
-  const annualSubscription = 134.16;
-  const monthlySubscription = annualSubscription / 12;
   const surplusSellPrice = 0.1;
-
-  const dataConsumption = months.map((m) => ({
-    x: m.month.substring(0, 3),
-    y: m.consumption,
-  }));
-  const dataSurplus = months.map((m) => ({
-    x: m.month.substring(0, 3),
-    y: m.surplus,
-  }));
-
   const totalConsumption = months.reduce((sum, m) => sum + m.consumption, 0);
   const totalSurplus = months.reduce((sum, m) => sum + m.surplus, 0);
-  const totalProduced = months.reduce((sum, m) => sum + m.production, 0);
-  const totalEDF = months.reduce(
-    (sum, m) => sum + m.production * edfPricePerKwh + monthlySubscription,
-    0
-  );
-  const totalGain = totalSurplus * surplusSellPrice;
+  const totalProduced = totalConsumption + totalSurplus;
+  const totalRevenue = (totalSurplus * surplusSellPrice).toFixed(2);
+
+  // Horaire (24h) — labels toutes les 2h
+  const hours = Array.from({ length: 12 }, (_, i) => `${i * 2}h`);
+  const solarProductionPerHour = [0, 0, 1, 6, 14, 15, 14, 10, 4, 1, 0, 0];
+
+  // Alerte Cyclone
+  const [cycloneAlert, setCycloneAlert] = useState(false);
+
+  useEffect(() => {
+    setCycloneAlert(false); // À brancher sur une API plus tard
+  }, []);
 
   return (
-    <LinearGradient
-      colors={["#f0f0f0", "#d9d9d9", "#ffffff"]}
-      style={styles.container}
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: isDark ? "#000" : isTwilight ? "#222" : "#fff" },
+      ]}
     >
+      {/* Retour */}
       <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
         <Ionicons name="arrow-back" size={24} color="#FB8C00" />
-        <Text style={styles.backButtonText}>Retour</Text>
+        <Text
+          style={[
+            styles.backButtonText,
+            { color: isDark ? "#eee" : "#FB8C00" },
+          ]}
+        >
+          Retour
+        </Text>
       </TouchableOpacity>
 
       <ScrollView showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Données Solaires</Text>
+        <Text style={[styles.title, { color: isDark ? "#FBC02D" : "#FBC02D" }]}>
+          Analyse Production
+        </Text>
 
-        <Text style={styles.subtitle}>Consommation & Surplus (kWh)</Text>
-
-        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-          <View style={{ paddingVertical: 20 }}>
-            <VictoryChart width={screenWidth * 1.4} domainPadding={{ x: 40 }}>
-              <VictoryAxis
-                style={{ tickLabels: { fontSize: 12, fill: "#333" } }}
-              />
-              <VictoryAxis
-                dependentAxis
-                style={{ tickLabels: { fontSize: 12, fill: "#333" } }}
-              />
-              <VictoryGroup offset={20} colorScale={["#FBC02D", "#66BB6A"]}>
-                <VictoryBar data={dataConsumption} />
-                <VictoryBar data={dataSurplus} />
-              </VictoryGroup>
-              <VictoryLegend
-                x={50}
-                y={0}
-                orientation="horizontal"
-                gutter={20}
-                data={[
-                  { name: "Consommation", symbol: { fill: "#FBC02D" } },
-                  { name: "Surplus", symbol: { fill: "#66BB6A" } },
-                ]}
-              />
-            </VictoryChart>
+        {/* Alerte Cyclone */}
+        <View style={styles.cycloneContainer}>
+          <Ionicons
+            name={cycloneAlert ? "warning-outline" : "cloud-outline"}
+            size={24}
+            color="#fff"
+            style={{ marginRight: 10 }}
+          />
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cycloneTitle}>Alerte Cyclonique ⚠️</Text>
+            <Text style={styles.cycloneMessage}>
+              {cycloneAlert
+                ? "Un cyclone approche. Limitez votre consommation et sécurisez vos équipements."
+                : "Aucun cyclone prévu pour le moment. Vous serez notifié en cas de danger."}
+            </Text>
           </View>
-        </ScrollView>
-
-        <Text style={styles.subtitle}>Détail par mois</Text>
-
-        <ScrollView horizontal>
-          <View>
-            <View style={styles.tableHeader}>
-              <Text style={[styles.tableCell, styles.tableHeaderText]}>
-                Mois
-              </Text>
-              <Text style={[styles.tableCell, styles.tableHeaderText]}>
-                Conso.
-              </Text>
-              <Text style={[styles.tableCell, styles.tableHeaderText]}>
-                Surplus
-              </Text>
-              <Text style={[styles.tableCell, styles.tableHeaderText]}>
-                Total
-              </Text>
-              <Text style={[styles.tableCell, styles.tableHeaderText]}>
-                EDF (€)
-              </Text>
-              <Text style={[styles.tableCell, styles.tableHeaderText]}>
-                Gain (€)
-              </Text>
-            </View>
-
-            {months.map((item, idx) => {
-              const edfCost = (
-                item.production * edfPricePerKwh +
-                monthlySubscription
-              ).toFixed(2);
-              const surplusGain = (item.surplus * surplusSellPrice).toFixed(2);
-              return (
-                <View key={idx} style={styles.tableRow}>
-                  <Text style={styles.tableCell}>{item.month}</Text>
-                  <Text style={styles.tableCell}>{item.consumption}</Text>
-                  <Text style={styles.tableCell}>{item.surplus}</Text>
-                  <Text style={styles.tableCell}>{item.production}</Text>
-                  <Text style={styles.tableCell}>{edfCost} €</Text>
-                  <Text style={styles.tableCell}>{surplusGain} €</Text>
-                </View>
-              );
-            })}
-          </View>
-        </ScrollView>
-
-        <View style={styles.summaryBox}>
-          <Text style={styles.summaryTitle}>
-            <Ionicons name="cash-outline" size={20} color="#FB8C00" /> Résumé
-            Annuel
-          </Text>
-          <Text style={styles.summaryText}>
-            Consommation totale : {totalConsumption} kWh
-          </Text>
-          <Text style={styles.summaryText}>
-            Surplus total : {totalSurplus} kWh
-          </Text>
-          <Text style={styles.summaryText}>
-            Total produit : {totalProduced} kWh
-          </Text>
-          <Text style={styles.summaryText}>
-            Coût EDF (avec abonnement) : {totalEDF.toFixed(2)} €
-          </Text>
-          <Text style={styles.summaryText}>
-            Gain du surplus : {totalGain.toFixed(2)} €
-          </Text>
         </View>
 
+        {/* Production sur 24h */}
+        <Text
+          style={[styles.subtitle, { color: isDark ? "#FB8C00" : "#FB8C00" }]}
+        >
+          Production sur 24h
+        </Text>
+
+        <LineChart
+          data={{
+            labels: hours,
+            datasets: [
+              {
+                data: solarProductionPerHour,
+                color: (opacity = 1) => `rgba(251, 192, 45, ${opacity})`,
+                strokeWidth: 2,
+              },
+            ],
+            legend: ["Production horaire (2h)"],
+          }}
+          width={screenWidth - 32}
+          height={280}
+          yAxisSuffix=" kWh"
+          chartConfig={{
+            backgroundGradientFrom: isDark ? "#000" : "#fff",
+            backgroundGradientTo: isDark ? "#000" : "#fff",
+            decimalPlaces: 0,
+            color: (opacity = 1) =>
+              isDark
+                ? `rgba(255,255,255,${opacity})`
+                : `rgba(0,0,0,${opacity})`,
+            labelColor: (opacity = 1) =>
+              isDark
+                ? `rgba(255,255,255,${opacity})`
+                : `rgba(0,0,0,${opacity})`,
+            propsForDots: {
+              r: "3",
+              strokeWidth: "2",
+              stroke: "#FBC02D",
+            },
+          }}
+          bezier
+          style={{
+            marginVertical: 20,
+            borderRadius: 16,
+          }}
+        />
+
+        {/* Graphes jauges */}
+        <Text
+          style={[styles.subtitle, { color: isDark ? "#FB8C00" : "#FB8C00" }]}
+        >
+          Production par Mois
+        </Text>
+
+        {months.map((item, idx) => {
+          const surplusRevenue = (item.surplus * surplusSellPrice).toFixed(2);
+          const totalWidth = screenWidth - 50;
+          const consoWidth = (item.consumption / item.production) * totalWidth;
+          const surplusWidth = (item.surplus / item.production) * totalWidth;
+
+          return (
+            <View key={idx} style={styles.jaugeContainer}>
+              <Text
+                style={[styles.monthLabel, { color: isDark ? "#eee" : "#333" }]}
+              >
+                {item.month}
+              </Text>
+              <Text style={styles.revenueText}>+ {surplusRevenue} €</Text>
+              <View style={styles.jaugeBar}>
+                <View style={[styles.consoBar, { width: consoWidth }]} />
+                <View style={[styles.surplusBar, { width: surplusWidth }]} />
+              </View>
+              <View style={styles.jaugeValues}>
+                <Text
+                  style={[
+                    styles.jaugeValue,
+                    { color: isDark ? "#ccc" : "#666" },
+                  ]}
+                >
+                  Conso: {item.consumption} kWh
+                </Text>
+                <Text
+                  style={[
+                    styles.jaugeValue,
+                    { color: isDark ? "#ccc" : "#666" },
+                  ]}
+                >
+                  Surplus: {item.surplus} kWh
+                </Text>
+              </View>
+            </View>
+          );
+        })}
+
+        {/* Récap Annuel */}
+        <Text
+          style={[styles.subtitle, { color: isDark ? "#FB8C00" : "#FB8C00" }]}
+        >
+          Récapitulatif Annuel
+        </Text>
+
+        <View style={styles.jaugeContainer}>
+          <Text style={styles.revenueText}>
+            Total Revente: + {totalRevenue} €
+          </Text>
+          <View style={styles.jaugeBar}>
+            <View
+              style={[
+                styles.consoBar,
+                {
+                  width:
+                    (totalConsumption / totalProduced) * (screenWidth - 50),
+                },
+              ]}
+            />
+            <View
+              style={[
+                styles.surplusBar,
+                { width: (totalSurplus / totalProduced) * (screenWidth - 50) },
+              ]}
+            />
+          </View>
+          <View style={styles.jaugeValues}>
+            <Text
+              style={[styles.jaugeValue, { color: isDark ? "#ccc" : "#666" }]}
+            >
+              Conso: {totalConsumption} kWh
+            </Text>
+            <Text
+              style={[styles.jaugeValue, { color: isDark ? "#ccc" : "#666" }]}
+            >
+              Surplus: {totalSurplus} kWh
+            </Text>
+          </View>
+        </View>
+
+        {/* Bouton détails */}
         <View style={styles.detailButton}>
           <TouchableOpacity
             style={styles.detailButtonInner}
@@ -181,10 +241,11 @@ export default function DataSolar() {
           </TouchableOpacity>
         </View>
       </ScrollView>
-    </LinearGradient>
+    </View>
   );
 }
 
+// Styles identiques
 const styles = StyleSheet.create({
   container: { flex: 1, paddingTop: 50, paddingHorizontal: 16 },
   backButton: {
@@ -196,7 +257,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   backButtonText: {
-    color: "#FB8C00",
     fontSize: 16,
     marginLeft: 6,
     fontWeight: "600",
@@ -206,62 +266,76 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 20,
     textAlign: "center",
-    color: "#FBC02D",
     paddingTop: 40,
   },
   subtitle: {
     fontSize: 18,
     fontWeight: "600",
     marginVertical: 10,
-    color: "#FB8C00",
   },
-  tableHeader: {
+  cycloneContainer: {
     flexDirection: "row",
-    backgroundColor: "#FB8C00",
-    padding: 8,
-    borderRadius: 4,
+    alignItems: "center",
+    backgroundColor: "#FF7043",
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 4,
   },
-  tableHeaderText: {
+  cycloneTitle: {
     color: "#fff",
     fontWeight: "bold",
-    fontSize: 10,
-  },
-  tableRow: {
-    flexDirection: "row",
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-  },
-  tableCell: {
-    minWidth: 70,
-    textAlign: "center",
-    fontSize: 12,
-  },
-  summaryBox: {
-    backgroundColor: "#ffffff",
-    padding: 16,
-    borderRadius: 8,
-    marginTop: 30,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 10,
-    elevation: 3,
-  },
-  summaryTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    marginBottom: 8,
-    color: "#FB8C00",
-  },
-  summaryText: {
-    fontSize: 14,
+    fontSize: 16,
     marginBottom: 4,
-    color: "#333",
+  },
+  cycloneMessage: {
+    color: "#fff",
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  jaugeContainer: {
+    marginBottom: 30,
+  },
+  monthLabel: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  revenueText: {
+    fontSize: 14,
+    color: "#66BB6A",
+    marginBottom: 4,
+  },
+  jaugeBar: {
+    flexDirection: "row",
+    height: 20,
+    borderRadius: 10,
+    overflow: "hidden",
+    backgroundColor: "#eee",
+  },
+  consoBar: {
+    height: 20,
+    backgroundColor: "#FBC02D",
+  },
+  surplusBar: {
+    height: 20,
+    backgroundColor: "#66BB6A",
+  },
+  jaugeValues: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 4,
+  },
+  jaugeValue: {
+    fontSize: 12,
   },
   detailButton: {
     marginTop: 30,
     alignItems: "center",
+    marginBottom: 40,
   },
   detailButtonInner: {
     flexDirection: "row",

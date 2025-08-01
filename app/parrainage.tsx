@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { addDoc, collection, Timestamp } from "firebase/firestore";
-import React, { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
@@ -15,9 +15,11 @@ import {
   View,
 } from "react-native";
 import { db } from "../firebaseConfig";
+import useDynamicTheme from "../utils/useDynamicTheme"; // ✅
 
 export default function Parrainage() {
   const router = useRouter();
+  const { isDark, isTwilight } = useDynamicTheme(); // ✅
 
   const [nom, setNom] = useState("");
   const [prenom, setPrenom] = useState("");
@@ -74,8 +76,19 @@ export default function Parrainage() {
       style={styles.background}
       resizeMode="cover"
     >
-      {/* ✅ Overlay d'opacité */}
-      <View style={styles.overlay} />
+      {/* ✅ Overlay dynamique */}
+      <View
+        style={[
+          styles.overlay,
+          {
+            backgroundColor: isDark
+              ? "rgba(0,0,0,0.6)"
+              : isTwilight
+              ? "rgba(0,0,0,0.3)"
+              : "rgba(0,0,0,0.2)",
+          },
+        ]}
+      />
 
       <KeyboardAvoidingView
         style={styles.flex}
@@ -115,12 +128,14 @@ export default function Parrainage() {
               value={nom}
               onChangeText={setNom}
               style={styles.input}
+              placeholderTextColor="#666"
             />
             <TextInput
               placeholder="Prénom *"
               value={prenom}
               onChangeText={setPrenom}
               style={styles.input}
+              placeholderTextColor="#666"
             />
             <TextInput
               placeholder="Email *"
@@ -128,6 +143,7 @@ export default function Parrainage() {
               value={email}
               onChangeText={setEmail}
               style={styles.input}
+              placeholderTextColor="#666"
             />
             <TextInput
               placeholder="Téléphone *"
@@ -135,18 +151,21 @@ export default function Parrainage() {
               value={telephone}
               onChangeText={setTelephone}
               style={styles.input}
+              placeholderTextColor="#666"
             />
             <TextInput
               placeholder="Ville"
               value={ville}
               onChangeText={setVille}
               style={styles.input}
+              placeholderTextColor="#666"
             />
             <TextInput
               placeholder="Nom du commercial"
               value={commercial}
               onChangeText={setCommercial}
               style={styles.input}
+              placeholderTextColor="#666"
             />
 
             <View style={styles.btn}>
@@ -164,11 +183,10 @@ const styles = StyleSheet.create({
     flex: 1,
     width: "100%",
     height: "100%",
-    position: "relative", // pour l'overlay
+    position: "relative",
   },
   overlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0, 0, 0, 0.3)",
   },
   flex: {
     flex: 1,

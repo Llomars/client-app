@@ -1,160 +1,130 @@
-import { Ionicons, MaterialIcons } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import {
-  Button,
-  Dimensions,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
-import * as Animatable from "react-native-animatable";
-import { LineChart } from "react-native-chart-kit";
+import useDynamicTheme from "../utils/useDynamicTheme"; // ✅ Ajout du hook
 
 export default function DataSolarDetail() {
   const router = useRouter();
-  const screenWidth = Dimensions.get("window").width;
+  const { theme, isDark, isTwilight } = useDynamicTheme(); // ✅ Hook dynamique
 
-  const dailyData = {
-    labels: ["1", "5", "10", "15", "20", "25", "30"],
-    datasets: [
-      {
-        data: [20, 30, 50, 40, 60, 70, 65],
-        strokeWidth: 2,
-      },
-    ],
-  };
-
-  const kWhProduced = 650;
-  const annualProduction = kWhProduced * 12;
-  const basePricePerKwh = 0.150425;
-  const annualIncrease = 0.05;
-  const projectionYears = 20;
-
-  let totalSavings = 0;
-  let pricePerKwh = basePricePerKwh;
-
-  for (let year = 1; year <= projectionYears; year++) {
-    totalSavings += annualProduction * pricePerKwh;
-    pricePerKwh *= 1 + annualIncrease;
-  }
-
-  const sunshineHours = 220;
-  const avgTemp = 18;
-  const eqCarKm = kWhProduced * 6;
-  const eqWasher = kWhProduced * 2;
+  // Données réalistes
+  const totalProduction = 5500; // kWh annuel
+  const co2Saved = (totalProduction * 0.0005).toFixed(2);
+  const kmDriven = (totalProduction * 0.9).toFixed(0);
+  const washingMachines = (totalProduction * 0.5).toFixed(0);
+  const treesPlanted = (totalProduction * 0.00015).toFixed(0);
 
   return (
-    <LinearGradient
-      colors={["#f0f0f0", "#d9d9d9", "#ffffff"]} // ✅ Fond gris clair élégant
-      style={styles.container}
+    <View
+      style={[
+        styles.container,
+        { backgroundColor: isDark ? "#000" : isTwilight ? "#222" : "#f0f0f0" },
+      ]}
     >
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <Button title="← Retour" onPress={() => router.back()} />
-
-        <Animatable.Text animation="fadeInDown" style={styles.title}>
-          🌞 Détails pour Avril
-        </Animatable.Text>
-
-        <Animatable.View animation="fadeInUp" delay={100} style={styles.card}>
-          <View style={styles.iconRow}>
-            <MaterialIcons name="trending-up" size={24} color="#FB8C00" />
-            <Text style={styles.cardTitle}>Variation</Text>
-          </View>
-          <Text style={styles.cardText}>
-            +18% de production par rapport à Mars
-          </Text>
-        </Animatable.View>
-
-        <Animatable.View animation="fadeInUp" delay={200} style={styles.card}>
-          <View style={styles.iconRow}>
-            <Ionicons name="analytics" size={24} color="#FB8C00" />
-            <Text style={styles.cardTitle}>Production quotidienne (kWh)</Text>
-          </View>
-          <LineChart
-            data={dailyData}
-            width={screenWidth - 64}
-            height={220}
-            chartConfig={chartConfig}
-            bezier
-            style={styles.chart}
-          />
-        </Animatable.View>
-
-        <Animatable.View animation="fadeInUp" delay={300} style={styles.card}>
-          <View style={styles.iconRow}>
-            <Ionicons name="sunny" size={24} color="#FBC02D" />
-            <Text style={styles.cardTitle}>Conditions météo</Text>
-          </View>
-          <Text style={styles.cardText}>
-            Heures d'ensoleillement : {sunshineHours} h
-          </Text>
-          <Text style={styles.cardText}>Température moyenne : {avgTemp}°C</Text>
-        </Animatable.View>
-
-        <Animatable.View animation="fadeInUp" delay={400} style={styles.card}>
-          <View style={styles.iconRow}>
-            <Ionicons name="swap-horizontal" size={24} color="#FBC02D" />
-            <Text style={styles.cardTitle}>Équivalences</Text>
-          </View>
-          <Text style={styles.cardText}>
-            🚗 {eqCarKm} km en voiture électrique
-          </Text>
-          <Text style={styles.cardText}>
-            🧺 {eqWasher} cycles de machine à laver
-          </Text>
-        </Animatable.View>
-
-        <Animatable.View
-          animation="fadeInUp"
-          delay={500}
-          style={styles.cardGradient}
+      {/* Bouton retour */}
+      <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <Ionicons name="arrow-back" size={24} color="#FB8C00" />
+        <Text
+          style={[
+            styles.backButtonText,
+            { color: isDark ? "#eee" : "#FB8C00" },
+          ]}
         >
-          <LinearGradient
-            colors={["#e0e0e0", "#ffffff"]}
-            style={styles.gradientBox}
-          >
-            <View style={styles.iconRow}>
-              <Ionicons name="cash-outline" size={24} color="#FB8C00" />
-              <Text style={styles.cardTitle}>
-                Projection sur {projectionYears} ans
-              </Text>
-            </View>
-            <Text style={styles.cardText}>
-              Production estimée : {annualProduction * projectionYears} kWh
-            </Text>
-            <Text style={styles.cardText}>
-              Économie EDF estimée (+5%/an) : {totalSavings.toFixed(2)} €
-            </Text>
-          </LinearGradient>
-        </Animatable.View>
+          Retour
+        </Text>
+      </TouchableOpacity>
 
-        <Animatable.View animation="fadeInUp" delay={600} style={styles.card}>
-          <View style={styles.iconRow}>
-            <Ionicons name="download-outline" size={24} color="#FB8C00" />
-            <Text style={styles.cardTitle}>Exporter</Text>
-          </View>
-          <Button title="Exporter en PDF (à venir)" onPress={() => {}} />
-          <View style={{ height: 10 }} />
-          <Button title="Exporter en CSV (à venir)" onPress={() => {}} />
-        </Animatable.View>
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <Text style={[styles.title, { color: "#FBC02D" }]}>
+          Votre Impact Écologique
+        </Text>
+
+        {/* Cartes indicateurs */}
+        <View
+          style={[styles.card, { backgroundColor: isDark ? "#111" : "#fff" }]}
+        >
+          <Ionicons name="car-sport-outline" size={50} color="#FB8C00" />
+          <Text style={[styles.cardValue, { color: isDark ? "#eee" : "#333" }]}>
+            {kmDriven} km
+          </Text>
+          <Text style={[styles.cardLabel, { color: isDark ? "#aaa" : "#777" }]}>
+            Parcourus en voiture
+          </Text>
+        </View>
+
+        <View
+          style={[styles.card, { backgroundColor: isDark ? "#111" : "#fff" }]}
+        >
+          <Ionicons name="water-outline" size={50} color="#66BB6A" />
+          <Text style={[styles.cardValue, { color: isDark ? "#eee" : "#333" }]}>
+            {washingMachines}
+          </Text>
+          <Text style={[styles.cardLabel, { color: isDark ? "#aaa" : "#777" }]}>
+            Machines à laver
+          </Text>
+        </View>
+
+        <View
+          style={[styles.card, { backgroundColor: isDark ? "#111" : "#fff" }]}
+        >
+          <Ionicons name="leaf-outline" size={50} color="#4CAF50" />
+          <Text style={[styles.cardValue, { color: isDark ? "#eee" : "#333" }]}>
+            {treesPlanted}
+          </Text>
+          <Text style={[styles.cardLabel, { color: isDark ? "#aaa" : "#777" }]}>
+            Arbres plantés (équivalent)
+          </Text>
+        </View>
+
+        <View
+          style={[styles.card, { backgroundColor: isDark ? "#111" : "#fff" }]}
+        >
+          <MaterialCommunityIcons
+            name="cloud-outline"
+            size={50}
+            color="#2196F3"
+          />
+          <Text style={[styles.cardValue, { color: isDark ? "#eee" : "#333" }]}>
+            {co2Saved} t
+          </Text>
+          <Text style={[styles.cardLabel, { color: isDark ? "#aaa" : "#777" }]}>
+            CO₂ économisé
+          </Text>
+        </View>
+
+        {/* Bouton vers Impact Écologique */}
+        <View style={[styles.detailButton, { marginTop: 10 }]}>
+          <TouchableOpacity
+            style={[styles.detailButtonInner, { backgroundColor: "#4CAF50" }]}
+            onPress={() => router.push("/impact-ecologique")}
+          >
+            <Ionicons name="leaf-outline" size={20} color="#fff" />
+            <Text style={styles.detailButtonText}>
+              Voir l'impact écologique
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Résumé Annuel */}
+        <View style={[styles.summaryBox]}>
+          <Text style={styles.summaryTitle}>Récapitulatif Annuel</Text>
+          <Text style={styles.summaryValue}>{totalProduction} kWh</Text>
+          <Text style={styles.summaryLabel}>Production totale</Text>
+          <Text style={styles.summaryValue}>
+            {(totalProduction * 0.1).toFixed(2)} €
+          </Text>
+          <Text style={styles.summaryLabel}>Revente estimée</Text>
+        </View>
       </ScrollView>
-    </LinearGradient>
+    </View>
   );
 }
-
-const chartConfig = {
-  backgroundGradientFrom: "#ffffff",
-  backgroundGradientTo: "#ffffff",
-  color: (opacity = 1) => `rgba(251, 188, 45, ${opacity})`, // jaune solaire pour la ligne
-  labelColor: (opacity = 1) => `rgba(0, 0, 0, ${opacity})`,
-  propsForDots: {
-    r: "5",
-    strokeWidth: "2",
-    stroke: "#FBC02D",
-  },
-};
 
 const styles = StyleSheet.create({
   container: {
@@ -162,50 +132,87 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingHorizontal: 16,
   },
+  backButton: {
+    position: "absolute",
+    top: 50,
+    left: 20,
+    zIndex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  backButtonText: {
+    fontSize: 16,
+    marginLeft: 6,
+    fontWeight: "600",
+  },
   title: {
     fontSize: 28,
     fontWeight: "bold",
-    marginBottom: 20,
     textAlign: "center",
-    color: "#FBC02D", // ✅ Jaune solaire pour le titre principal
+    marginBottom: 30,
+    paddingTop: 40,
   },
   card: {
-    backgroundColor: "#ffffff",
+    padding: 24,
     borderRadius: 16,
-    padding: 20,
-    marginVertical: 10,
+    alignItems: "center",
+    marginBottom: 20,
     shadowColor: "#000",
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.1,
     shadowOffset: { width: 0, height: 4 },
     shadowRadius: 10,
     elevation: 3,
   },
-  cardGradient: {
-    borderRadius: 16,
-    overflow: "hidden",
-    marginVertical: 10,
+  cardValue: {
+    fontSize: 32,
+    fontWeight: "bold",
+    marginTop: 10,
   },
-  gradientBox: {
-    padding: 20,
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    marginLeft: 8,
-    color: "#FB8C00", // ✅ Orange doux pour sous-titres
-  },
-  cardText: {
+  cardLabel: {
     fontSize: 16,
-    marginBottom: 5,
-    color: "#333",
+    textAlign: "center",
+    marginTop: 4,
   },
-  chart: {
-    marginVertical: 8,
-    borderRadius: 16,
-  },
-  iconRow: {
-    flexDirection: "row",
+  detailButton: {
+    marginTop: 30,
     alignItems: "center",
-    marginBottom: 10,
+    marginBottom: 40,
+  },
+  detailButtonInner: {
+    flexDirection: "row",
+    backgroundColor: "#FB8C00",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 25,
+    alignItems: "center",
+  },
+  detailButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    marginLeft: 8,
+    fontWeight: "600",
+  },
+  summaryBox: {
+    backgroundColor: "#FB8C00",
+    padding: 24,
+    borderRadius: 16,
+    marginTop: 30,
+    alignItems: "center",
+  },
+  summaryTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#fff",
+    marginBottom: 12,
+  },
+  summaryValue: {
+    fontSize: 30,
+    fontWeight: "bold",
+    color: "#fff",
+  },
+  summaryLabel: {
+    fontSize: 16,
+    color: "#fff",
+    marginBottom: 8,
   },
 });
