@@ -2,11 +2,13 @@
 
 # dependencies
 node_modules/
+build/
+dist/
+*.log
+.firebase/
 
 # Expo
 .expo/
-dist/
-web-build/
 expo-env.d.ts
 
 # Native
