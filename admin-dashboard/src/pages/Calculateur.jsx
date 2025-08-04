@@ -3,7 +3,6 @@ import { collection, doc, getDocs, updateDoc } from 'firebase/firestore';
 import { jsPDF } from 'jspdf';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { useEffect, useState } from 'react';
 import { MapContainer, Marker, TileLayer, useMapEvent } from 'react-leaflet';
 import { db } from '../firebaseConfig';
 // ...existing code...
