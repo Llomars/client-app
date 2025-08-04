@@ -10,6 +10,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../firebaseConfig';
 
+
+export default function Profile() {
   const [user, setUser] = useState(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -159,6 +161,7 @@ import { auth } from '../firebaseConfig';
       </div>
     </div>
   );
+}
 
 const inputStyle = {
   width: '100%',
