@@ -10,7 +10,32 @@ import { db } from '../firebaseConfig';
 
 // db est importé depuis firebaseConfig.js (déjà initialisé)
 
+import { useEffect, useState } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '../firebaseConfig';
+
 export default function Calculateur() {
+  const [userRole, setUserRole] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, async (u) => {
+      if (u) {
+        const idToken = await u.getIdTokenResult();
+        setUserRole(idToken.claims.role || null);
+      } else {
+        setUserRole(null);
+      }
+      setAuthChecked(true);
+    });
+    return () => unsub();
+  }, []);
+
+  // Affiche rien tant que l'auth n'est pas vérifiée
+  if (!authChecked) return null;
+  // Affiche rien si l'utilisateur n'est pas admin, commercial ou manager
+  if (!["admin", "commercial", "manager"].includes(userRole)) {
+    return <div style={{padding: 40, color: '#dc2626', fontWeight: 600}}>Accès réservé aux administrateurs, commerciaux et managers.</div>;
+  }
   // Chargement de l'image Pétales.png en base64 pour le PDF
   useEffect(() => {
     if (!window.petalesPngDataUrl) {
