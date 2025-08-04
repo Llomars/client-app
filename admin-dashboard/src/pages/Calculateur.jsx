@@ -851,7 +851,15 @@ export default function Calculateur() {
         const azimut = orientationAzimut[orientation] ?? 180;
         const angle = inclinaison;
         let url = `https://re.jrc.ec.europa.eu/api/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-ERA5&peakpower=${kw}&loss=14&angle=${angle}&aspect=${azimut}&outputformat=json`;
-        let proxyUrl = `http://localhost:4000/pvgis?url=${encodeURIComponent(url)}`;
+        // Utilise le proxy local en dev, sinon la serverless function Vercel
+        let proxyUrl = '/api/pvgis';
+        // On passe les paramètres en query string
+        const urlObj = new URL(url);
+        proxyUrl += `?lat=${urlObj.searchParams.get('lat')}`;
+        proxyUrl += `&lon=${urlObj.searchParams.get('lon')}`;
+        proxyUrl += `&puissance=${urlObj.searchParams.get('peakpower')}`;
+        proxyUrl += `&angle=${urlObj.searchParams.get('angle')}`;
+        proxyUrl += `&azimut=${urlObj.searchParams.get('aspect')}`;
         let res, kwh;
         console.log('PVGIS URL:', url);
         try {
@@ -876,7 +884,13 @@ export default function Calculateur() {
         } catch (err) {
           // Si PVcalc échoue, tente v5_2/PVcalc
           url = `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-ERA5&peakpower=${kw}&loss=14&angle=${angle}&aspect=${azimut}&outputformat=json`;
-          proxyUrl = `http://localhost:4000/pvgis?url=${encodeURIComponent(url)}`;
+          proxyUrl = '/api/pvgis';
+          const urlObj2 = new URL(url);
+          proxyUrl += `?lat=${urlObj2.searchParams.get('lat')}`;
+          proxyUrl += `&lon=${urlObj2.searchParams.get('lon')}`;
+          proxyUrl += `&puissance=${urlObj2.searchParams.get('peakpower')}`;
+          proxyUrl += `&angle=${urlObj2.searchParams.get('angle')}`;
+          proxyUrl += `&azimut=${urlObj2.searchParams.get('aspect')}`;
           console.log('PVGIS fallback URL:', url);
           try {
             res = await axios.get(proxyUrl);
