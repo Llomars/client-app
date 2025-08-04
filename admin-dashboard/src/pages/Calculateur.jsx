@@ -14,8 +14,11 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebaseConfig';
 
 export default function Calculateur() {
+  // Tous les hooks doivent être appelés AVANT tout return ou condition !
   const [userRole, setUserRole] = useState(null);
   const [authChecked, setAuthChecked] = useState(false);
+  // ... tous les autres useState initiaux ...
+
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (u) => {
       if (u) {
@@ -29,9 +32,10 @@ export default function Calculateur() {
     return () => unsub();
   }, []);
 
-  // Affiche rien tant que l'auth n'est pas vérifiée
+  // ... tous les autres useEffect initiaux ...
+
+  // Contrôle d'accès APRÈS l'init des hooks
   if (!authChecked) return null;
-  // Affiche rien si l'utilisateur n'est pas admin, commercial ou manager
   if (!["admin", "commercial", "manager"].includes(userRole)) {
     return <div style={{padding: 40, color: '#dc2626', fontWeight: 600}}>Accès réservé aux administrateurs, commerciaux et managers.</div>;
   }
