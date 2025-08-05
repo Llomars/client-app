@@ -934,61 +934,21 @@ function Calculateur() {
         return;
       }
       try {
-        // Ajoute angle (inclinaison) et aspect (azimut) à la requête
         const azimut = orientationAzimut[orientation] ?? 180;
         const angle = inclinaison;
-        let url = `https://re.jrc.ec.europa.eu/api/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-ERA5&peakpower=${kw}&loss=14&angle=${angle}&aspect=${azimut}&outputformat=json`;
-        let proxyUrl = url;
-        let res, kwh;
-        console.log('PVGIS URL:', url);
-        try {
-          res = await axios.get(proxyUrl);
-          console.log('Réponse reçue du proxy PVGIS:', res.data); // LOG DEBUG
-          // Log pour debug la structure de outputs.totals
-          console.log('outputs.totals:', res.data?.outputs?.totals);
-          // Correction du parsing pour E_y
-          let totals = res.data?.outputs?.totals;
-          if (totals?.fixed?.E_y) {
-            kwh = totals.fixed.E_y;
-          } else if (totals?.E_y) {
-            kwh = totals.E_y;
-          } else {
-            kwh = 0;
-          }
-          if (!kwh) {
-            console.warn('PVGIS ERA5 no kwh, response:', res.data);
-          }
-          setProdMoyenneKwh(kwh || 0);
-          setLoadingPVGIS(false);
-        } catch (err) {
-          // Si PVcalc échoue, tente v5_2/PVcalc
-          url = `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-ERA5&peakpower=${kw}&loss=14&angle=${angle}&aspect=${azimut}&outputformat=json`;
-          proxyUrl = url;
-          console.log('PVGIS fallback URL:', url);
-          try {
-            res = await axios.get(proxyUrl);
-            kwh = res.data?.outputs?.totals?.fixed?.E_y;
-            if (!kwh) {
-              console.warn('PVGIS v5_2 ERA5 no kwh, response:', res.data);
-            }
-          } catch (err2) {
-            setProdMoyenneKwh(0);
-            let msg = 'Erreur lors de la requête PVGIS (v5_2).';
-            if (err2.response && err2.response.data) {
-              if (err2.response.data.message) msg = err2.response.data.message;
-              else if (err2.response.data.error) msg = err2.response.data.error;
-              else if (typeof err2.response.data === 'string') msg = err2.response.data;
-              msg += `\n(code ${err2.response.status})`;
-              msg += '\n' + JSON.stringify(err2.response.data, null, 2);
-            }
-            setPvError(msg);
-            console.error('PVGIS error:', err2);
-            setLoadingPVGIS(false);
-            return;
-          }
+        // Utilise la fonction utilitaire qui passe par le proxy
+        const kwh = await getPVGISProduction(coords.lat, coords.lng, kw, angle, azimut);
+        if (kwh) {
+          setProdMoyenneKwh(kwh);
+        } else {
+          setProdMoyenneKwh(0);
+          setPvError('Aucune donnée de production reçue de PVGIS.');
         }
       } catch (err) {
+        setProdMoyenneKwh(0);
         setPvError('Erreur lors de la requête PVGIS.');
+        console.error('PVGIS error:', err);
+      } finally {
         setLoadingPVGIS(false);
       }
     }
