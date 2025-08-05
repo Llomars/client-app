@@ -723,7 +723,7 @@ function Calculateur() {
         const azimut = orientationAzimut[orientation] ?? 180;
         const angle = inclinaison;
         let url = `https://re.jrc.ec.europa.eu/api/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-ERA5&peakpower=${kw}&loss=14&angle=${angle}&aspect=${azimut}&outputformat=json`;
-        let proxyUrl = `http://localhost:4000/pvgis?url=${encodeURIComponent(url)}`;
+        let proxyUrl = `/api/pvgis?url=${encodeURIComponent(url)}`;
         let res, kwh;
         console.log('PVGIS URL:', url);
         try {
@@ -748,7 +748,7 @@ function Calculateur() {
         } catch (err) {
           // Si PVcalc échoue, tente v5_2/PVcalc
           url = `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-ERA5&peakpower=${kw}&loss=14&angle=${angle}&aspect=${azimut}&outputformat=json`;
-          proxyUrl = `http://localhost:4000/pvgis?url=${encodeURIComponent(url)}`;
+          proxyUrl = `/api/pvgis?url=${encodeURIComponent(url)}`;
           console.log('PVGIS fallback URL:', url);
           try {
             res = await axios.get(proxyUrl);
@@ -756,6 +756,8 @@ function Calculateur() {
             if (!kwh) {
               console.warn('PVGIS v5_2 ERA5 no kwh, response:', res.data);
             }
+            setProdMoyenneKwh(kwh || 0);
+            setLoadingPVGIS(false);
           } catch (err2) {
             setProdMoyenneKwh(0);
             let msg = 'Erreur lors de la requête PVGIS (v5_2).';

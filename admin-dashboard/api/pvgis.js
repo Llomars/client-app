@@ -1,16 +1,17 @@
-// Vercel Serverless Function: /api/pvgis
+// Proxy PVGIS pour Vercel (serverless function ou local)
+import axios from 'axios';
 
-
-  const { lat, lon, puissance, angle, azimut } = req.query;
-  if (!lat || !lon) {
-    return res.status(400).json({ error: 'Coordonnées lat/lon manquantes.' });
+export default async function handler(req, res) {
+  const { url } = req.query;
+  if (!url) {
+    res.status(400).json({ error: 'Missing url parameter' });
+    return;
   }
-  const url = `https://re.jrc.ec.europa.eu/api/PVcalc?lat=${lat}&lon=${lon}&raddatabase=PVGIS-ERA5&peakpower=${puissance || 3}&loss=14&angle=${angle || 30}&aspect=${azimut || 0}&outputformat=json`;
   try {
-    const response = await globalThis.fetch(url);
-    const data = await response.json();
-    res.status(200).json(data);
+    const response = await axios.get(url);
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.status(200).json(response.data);
   } catch (e) {
-    res.status(500).json({ error: 'Erreur lors de la requête vers PVGIS.' });
+    res.status(500).json({ error: e.message });
   }
-// Fin de la fonction handler
+}
