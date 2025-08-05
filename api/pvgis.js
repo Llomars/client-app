@@ -3,6 +3,7 @@
 
 import axios from 'axios';
 
+export default async function handler(req, res) {
   const { lat, lon, puissance = 3, angle = 30, azimut = 0 } = req.query;
   if (!lat || !lon) {
     res.status(400).json({ error: 'Missing lat/lon parameter' });
