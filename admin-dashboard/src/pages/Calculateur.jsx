@@ -722,10 +722,8 @@ function Calculateur() {
         // Ajoute angle (inclinaison) et aspect (azimut) à la requête
         const azimut = orientationAzimut[orientation] ?? 180;
         const angle = inclinaison;
-        let url = `https://re.jrc.ec.europa.eu/api/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-ERA5&peakpower=${kw}&loss=14&angle=${angle}&aspect=${azimut}&outputformat=json`;
+        let proxyUrl = `/api/pvgis?lat=${coords.lat}&lon=${coords.lng}&puissance=${kw}&angle=${angle}&azimut=${azimut}`;
         let res, kwh;
-        let proxyUrl = url;
-        console.log('PVGIS URL:', url);
         try {
           res = await axios.get(proxyUrl);
           console.log('Réponse reçue du proxy PVGIS:', res.data); // LOG DEBUG
@@ -746,33 +744,19 @@ function Calculateur() {
           setProdMoyenneKwh(kwh || 0);
           setLoadingPVGIS(false);
         } catch (err) {
-          // Si PVcalc échoue, tente v5_2/PVcalc
-          url = `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-ERA5&peakpower=${kw}&loss=14&angle=${angle}&aspect=${azimut}&outputformat=json`;
-          proxyUrl = url;
-          console.log('PVGIS fallback URL:', url);
-          try {
-            res = await axios.get(proxyUrl);
-            kwh = res.data?.outputs?.totals?.fixed?.E_y;
-            if (!kwh) {
-              console.warn('PVGIS v5_2 ERA5 no kwh, response:', res.data);
-            }
-            setProdMoyenneKwh(kwh || 0);
-            setLoadingPVGIS(false);
-          } catch (err2) {
-            setProdMoyenneKwh(0);
-            let msg = 'Erreur lors de la requête PVGIS (v5_2).';
-            if (err2.response && err2.response.data) {
-              if (err2.response.data.message) msg = err2.response.data.message;
-              else if (err2.response.data.error) msg = err2.response.data.error;
-              else if (typeof err2.response.data === 'string') msg = err2.response.data;
-              msg += `\n(code ${err2.response.status})`;
-              msg += '\n' + JSON.stringify(err2.response.data, null, 2);
-            }
-            setPvError(msg);
-            console.error('PVGIS error:', err2);
-            setLoadingPVGIS(false);
-            return;
+          setProdMoyenneKwh(0);
+          let msg = 'Erreur lors de la requête PVGIS (proxy).';
+          if (err.response && err.response.data) {
+            if (err.response.data.message) msg = err.response.data.message;
+            else if (err.response.data.error) msg = err.response.data.error;
+            else if (typeof err.response.data === 'string') msg = err.response.data;
+            msg += `\n(code ${err.response.status})`;
+            msg += '\n' + JSON.stringify(err.response.data, null, 2);
           }
+          setPvError(msg);
+          console.error('PVGIS error:', err);
+          setLoadingPVGIS(false);
+          return;
         }
       } catch (err) {
         setPvError('Erreur lors de la requête PVGIS.');
