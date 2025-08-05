@@ -723,8 +723,8 @@ function Calculateur() {
         const azimut = orientationAzimut[orientation] ?? 180;
         const angle = inclinaison;
         let url = `https://re.jrc.ec.europa.eu/api/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-ERA5&peakpower=${kw}&loss=14&angle=${angle}&aspect=${azimut}&outputformat=json`;
-        let proxyUrl = `/api/pvgis?url=${encodeURIComponent(url)}`;
         let res, kwh;
+        let proxyUrl = `/api/pvgis?url=${encodeURIComponent(url)}`;
         console.log('PVGIS URL:', url);
         try {
           res = await axios.get(proxyUrl);
