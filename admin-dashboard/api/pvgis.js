@@ -8,16 +8,27 @@ export default async function handler(req, res) {
     return;
   }
   try {
+    console.log('[PVGIS PROXY] Appel:', url);
     const response = await axios.get(url);
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.status(200).json(response.data);
   } catch (e) {
-    // Log l'erreur complète côté serverless
-    console.error('PVGIS proxy error:', e?.response?.data || e.message || e);
+    // Log complet : code HTTP, data, headers, message
+    if (e.response) {
+      console.error('[PVGIS PROXY ERROR]', {
+        url,
+        status: e.response.status,
+        statusText: e.response.statusText,
+        data: e.response.data,
+        headers: e.response.headers
+      });
+    } else {
+      console.error('[PVGIS PROXY ERROR]', { url, message: e.message });
+    }
     let errorMsg = e.message;
     if (e.response && e.response.data) {
       errorMsg = e.response.data;
     }
-    res.status(500).json({ error: errorMsg });
+    res.status(500).json({ error: errorMsg, status: e.response?.status });
   }
 }
