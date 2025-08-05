@@ -12,6 +12,12 @@ export default async function handler(req, res) {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.status(200).json(response.data);
   } catch (e) {
-    res.status(500).json({ error: e.message });
+    // Log l'erreur complète côté serverless
+    console.error('PVGIS proxy error:', e?.response?.data || e.message || e);
+    let errorMsg = e.message;
+    if (e.response && e.response.data) {
+      errorMsg = e.response.data;
+    }
+    res.status(500).json({ error: errorMsg });
   }
 }
