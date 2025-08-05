@@ -1,4 +1,5 @@
 // Proxy PVGIS pour Vercel (serverless function ou local)
+// trigger vercel redeploy
 import axios from 'axios';
 
 export default async function handler(req, res) {
