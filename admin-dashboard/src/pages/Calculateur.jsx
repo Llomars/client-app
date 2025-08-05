@@ -48,8 +48,7 @@ function Calculateur() {
   // --- Génération PDF quali ---
   const handleGeneratePDF = async (previewOnly = false) => {
     setPdfLoading(true);
-    try {
-      const docPdf = new jsPDF();
+    const docPdf = new jsPDF();
       // --- Ajout logo société en base64 (DataURL) ---
       const getBase64FromUrl = async (url) => {
         const response = await fetch(url);
@@ -237,63 +236,59 @@ function Calculateur() {
         docPdf.setFontSize(16);
         docPdf.setTextColor(16, 185, 129);
         docPdf.text(`${totalDiff ? totalDiff + ' €' : '-'}`, col1X + blockW/2, rowY+16, { align: 'center' });
-        // Cumul location EDF
-        docPdf.setFont('helvetica', 'bold');
-        docPdf.setFontSize(13);
-        docPdf.setTextColor(220,38,38);
-        docPdf.text('Cumul location EDF', col2X + blockW/2, rowY+10, { align: 'center' });
-        docPdf.setFont('helvetica', 'normal');
-        docPdf.setFillColor(255,255,255);
-        docPdf.roundedRect(col2X, rowY, blockW, blockH, blockR, blockR, 'F');
-        docPdf.setDrawColor(0, 0, 0);
-        docPdf.setLineWidth(1.1);
-        docPdf.roundedRect(col2X, rowY, blockW, blockH, blockR, blockR);
-        docPdf.setLineWidth(0.2);
-        docPdf.setFont('helvetica', 'bold');
-        docPdf.setFontSize(16);
-        docPdf.text(`${totalEdfSynth} €`, col2X + blockW/2, rowY+16, { align: 'center' });
+      // Ajoute angle (inclinaison) et aspect (azimut) à la requête
+      const azimut = orientationAzimut[orientation] ?? 180;
+      const angle = inclinaison;
+      let url = `https://re.jrc.ec.europa.eu/api/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-ERA5&peakpower=${kw}&loss=14&angle=${angle}&aspect=${azimut}&outputformat=json`;
+      let res, kwh;
+      console.log('PVGIS URL:', url);
+      try {
+        res = await axios.get(url);
+        console.log('Réponse reçue de PVGIS:', res.data); // LOG DEBUG
+        // Log pour debug la structure de outputs.totals
+        console.log('outputs.totals:', res.data?.outputs?.totals);
+        // Correction du parsing pour E_y
+        let totals = res.data?.outputs?.totals;
+        if (totals?.fixed?.E_y) {
+          kwh = totals.fixed.E_y;
+        } else if (totals?.E_y) {
+          kwh = totals.E_y;
+        } else {
+          kwh = 0;
+        }
+        if (!kwh) {
+          console.warn('PVGIS ERA5 no kwh, response:', res.data);
+        }
+        setProdMoyenneKwh(kwh || 0);
+        setLoadingPVGIS(false);
+      } catch (err) {
+        // Si PVcalc échoue, tente v5_2/PVcalc
+        url = `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-ERA5&peakpower=${kw}&loss=14&angle=${angle}&aspect=${azimut}&outputformat=json`;
+        console.log('PVGIS fallback URL:', url);
+        try {
+          res = await axios.get(url);
+          kwh = res.data?.outputs?.totals?.fixed?.E_y;
+          if (!kwh) {
+            console.warn('PVGIS v5_2 ERA5 no kwh, response:', res.data);
+          }
+          setProdMoyenneKwh(kwh || 0);
+          setLoadingPVGIS(false);
+        } catch (err2) {
+          setProdMoyenneKwh(0);
+          let msg = 'Erreur lors de la requête PVGIS (v5_2).';
+          if (err2.response && err2.response.data) {
+            if (err2.response.data.message) msg = err2.response.data.message;
+            else if (err2.response.data.error) msg = err2.response.data.error;
+            else if (typeof err2.response.data === 'string') msg = err2.response.data;
+            msg += `\n(code ${err2.response.status})`;
+            msg += '\n' + JSON.stringify(err2.response.data, null, 2);
+          }
+          setPvError(msg);
+          console.error('PVGIS error:', err2);
+          setLoadingPVGIS(false);
+          return;
+        }
       }
-      // PAGE 2 : Tableau de rentabilité complet (20 ans)
-      docPdf.addPage();
-      // Image pétales en bas à droite (page 2, comme avant)
-      if (window.petalesPngDataUrl) {
-        docPdf.addImage(window.petalesPngDataUrl, 'PNG', 120, 235, 90, 60);
-      }
-      docPdf.setFontSize(13);
-      docPdf.setTextColor(30, 64, 175);
-      docPdf.text('Tableau de rentabilité complet (20 ans)', 15, 20);
-      docPdf.setFontSize(10);
-      docPdf.setTextColor(0,0,0);
-      const tableY2 = 28;
-      docPdf.setFillColor(255,255,255);
-      docPdf.rect(10, tableY2, 190, 7, 'F');
-      docPdf.setDrawColor(0,0,0);
-      docPdf.rect(10, tableY2, 190, 7);
-      docPdf.setTextColor(30, 64, 175);
-      docPdf.text('Année', 12, tableY2+5);
-      docPdf.text('Coût EDF', 28, tableY2+5);
-      docPdf.text('Coût centrale', 52, tableY2+5);
-      docPdf.text('Revente', 82, tableY2+5);
-      docPdf.text('Éco.', 108, tableY2+5);
-      docPdf.text('Mens. EDF', 132, tableY2+5);
-      docPdf.text('Mens. centrale', 160, tableY2+5);
-      let rowY2 = tableY2+7;
-      for (let i = 0; i < rentabilite.length; i++) {
-        const row = rentabilite[i];
-        docPdf.setTextColor(0,0,0);
-        docPdf.text(`${row.annee}`.slice(-2), 12, rowY2+5);
-        docPdf.text(`${row.coutEdf} €`, 28, rowY2+5);
-        docPdf.text(`${row.coutCentrale} €`, 52, rowY2+5);
-        docPdf.setTextColor(191, 161, 0);
-        docPdf.text(`${row.reventeEstimee} €`, 82, rowY2+5);
-        docPdf.setTextColor(16, 185, 129);
-        docPdf.text(`${row.diff} €`, 108, rowY2+5);
-        docPdf.setTextColor(30, 64, 175);
-        docPdf.text(`${row.mensualiteEdf} €`, 132, rowY2+5);
-        docPdf.text(`${row.mensualiteCentrale} €`, 160, rowY2+5);
-        rowY2 += 7;
-      }
-      // Totaux
       docPdf.setFont('helvetica', 'bold');
       docPdf.setTextColor(202, 138, 4);
       rowY2 += 20;
@@ -495,10 +490,7 @@ function Calculateur() {
         docPdf.save('simulation-photovoltaique.pdf');
         setPdfLoading(false);
       }
-    } catch (e) {
-      setPdfLoading(false);
-      alert('Erreur génération PDF : ' + e.message);
-    }
+    // ...
   };
   // --- Données statiques et variables calculées nécessaires aux hooks ---
   const currentYear = new Date().getFullYear();
