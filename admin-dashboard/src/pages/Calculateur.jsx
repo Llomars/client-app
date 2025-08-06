@@ -724,12 +724,7 @@ function Calculateur() {
         const angle = inclinaison;
         let urlPVGIS = `https://re.jrc.ec.europa.eu/api/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-ERA5&peakpower=${kw}&loss=14&angle=${angle}&aspect=${azimut}&outputformat=json`;
         // Utilise le proxy local en dev, proxy Vercel en prod
-        let proxyBase = '';
-        if (window.location.hostname === 'localhost') {
-          proxyBase = 'http://localhost:3000';
-        } else {
-          proxyBase = 'https://ton-proxy.vercel.app'; // Remplace par ton vrai domaine proxy Vercel
-        }
+        // Utilise toujours le proxy Vercel en production comme en dev
         let proxyUrl = `https://pvgis-proxy-next-clean.vercel.app/api/pvgis?url=${encodeURIComponent(urlPVGIS)}`;
         let res, kwh;
         console.log('PVGIS URL:', urlPVGIS);
@@ -802,7 +797,7 @@ function Calculateur() {
   }, [showClientModal]);
 
   // ...existing code...
-// Exemple d'utilisation de encodeURIComponent pour générer l'URL proxy PVGIS :
+// Exemple d'utilisation :
 // const urlPVGIS = "https://re.jrc.ec.europa.eu/api/PVcalc?lat=-21.1151&lon=55.5364&raddatabase=PVGIS-ERA5&peakpower=6&loss=14&angle=20&aspect=0&outputformat=json";
 // const proxyUrl = `https://pvgis-proxy-next-clean.vercel.app/api/pvgis?url=${encodeURIComponent(urlPVGIS)}`;
 // Résultat : https://pvgis-proxy-next-clean.vercel.app/api/pvgis?url=https%3A%2F%2Fre.jrc.ec.europa.eu%2Fapi%2FPVcalc%3Flat%3D-21.1151%26lon%3D55.5364%26raddatabase%3DPVGIS-ERA5%26peakpower%3D6%26loss%3D14%26angle%3D20%26aspect%3D0%26outputformat%3Djson
