@@ -7,7 +7,7 @@ export default function PVGISDemo() {
   useEffect(() => {
     const pvgisUrl = "https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=48.85&lon=2.35&peakpower=1&loss=14&outputformat=json";
     const encodedUrl = encodeURIComponent(pvgisUrl);
-    fetch(`http://localhost:3000/api/pvgis?url=${encodedUrl}`)
+    fetch(`https://pvgis-proxy-next-clean.vercel.app/api/pvgis?url=${encodedUrl}`)
       .then(res => {
         if (res.headers.get('content-type')?.includes('application/json')) {
           return res.json();
