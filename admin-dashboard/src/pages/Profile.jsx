@@ -4,19 +4,16 @@ import {
   onAuthStateChanged,
   signInWithEmailAndPassword,
   signOut,
-  sendPasswordResetEmail,
 } from 'firebase/auth';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { auth } from '../firebaseConfig';
-
 
 export default function Profile() {
   const [user, setUser] = useState(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
-  const [resetMessage, setResetMessage] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -42,22 +39,6 @@ export default function Profile() {
     await signOut(auth);
     setEmail('');
     setPassword('');
-  };
-
-  // Fonction pour envoyer l'email de réinitialisation du mot de passe
-  const handleResetPassword = async () => {
-    setResetMessage('');
-    setError('');
-    if (!email) {
-      setError('Veuillez entrer votre email pour réinitialiser le mot de passe.');
-      return;
-    }
-    try {
-      await sendPasswordResetEmail(auth, email);
-      setResetMessage('Un email de réinitialisation a été envoyé.');
-    } catch (err) {
-      setError("Erreur lors de l'envoi de l'email de réinitialisation.");
-    }
   };
 
   return (
@@ -105,9 +86,6 @@ export default function Profile() {
             {error && (
               <p style={{ color: '#dc2626', marginBottom: '12px' }}>{error}</p>
             )}
-            {resetMessage && (
-              <p style={{ color: '#16a34a', marginBottom: '12px' }}>{resetMessage}</p>
-            )}
             <input
               type="email"
               placeholder="Email"
@@ -124,18 +102,6 @@ export default function Profile() {
             />
             <button onClick={handleLogin} style={btnStyle('#10b981')}>
               ✅ Connexion
-            </button>
-            <button
-              onClick={handleResetPassword}
-              style={{
-                ...btnStyle('#f59e42'),
-                background: '#f59e42',
-                color: '#fff',
-                marginBottom: '8px',
-                fontSize: '14px',
-              }}
-            >
-              Mot de passe oublié ?
             </button>
             <p
               style={{ marginTop: '16px', fontSize: '14px', color: '#4b5563' }}
