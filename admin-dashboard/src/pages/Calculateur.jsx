@@ -723,8 +723,14 @@ function Calculateur() {
         const azimut = orientationAzimut[orientation] ?? 180;
         const angle = inclinaison;
         let urlPVGIS = `https://re.jrc.ec.europa.eu/api/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-ERA5&peakpower=${kw}&loss=14&angle=${angle}&aspect=${azimut}&outputformat=json`;
-        let proxyBase = (window.location.hostname === 'localhost') ? 'http://localhost:3000' : '';
-        let proxyUrl = `${proxyBase}/api/pvgis?url=${encodeURIComponent(urlPVGIS)}`;
+        // Utilise le proxy local en dev, proxy Vercel en prod
+        let proxyBase = '';
+        if (window.location.hostname === 'localhost') {
+          proxyBase = 'http://localhost:3000';
+        } else {
+          proxyBase = 'https://ton-proxy.vercel.app'; // Remplace par ton vrai domaine proxy Vercel
+        }
+        let proxyUrl = `https://pvgis-proxy-next-clean.vercel.app/api/pvgis?url=${encodeURIComponent(urlPVGIS)}`;
         let res, kwh;
         console.log('PVGIS URL:', urlPVGIS);
         try {
@@ -749,7 +755,7 @@ function Calculateur() {
         } catch (err) {
           // Si PVcalc échoue, tente v5_2/PVcalc
           urlPVGIS = `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-ERA5&peakpower=${kw}&loss=14&angle=${angle}&aspect=${azimut}&outputformat=json`;
-          proxyUrl = `${proxyBase}/api/pvgis?url=${encodeURIComponent(urlPVGIS)}`;
+          proxyUrl = `https://pvgis-proxy-next-clean.vercel.app/api/pvgis?url=${encodeURIComponent(urlPVGIS)}`;
           console.log('PVGIS fallback URL:', urlPVGIS);
           try {
             res = await axios.get(proxyUrl);
@@ -798,8 +804,8 @@ function Calculateur() {
   // ...existing code...
 // Exemple d'utilisation de encodeURIComponent pour générer l'URL proxy PVGIS :
 // const urlPVGIS = "https://re.jrc.ec.europa.eu/api/PVcalc?lat=-21.1151&lon=55.5364&raddatabase=PVGIS-ERA5&peakpower=6&loss=14&angle=20&aspect=0&outputformat=json";
-// const proxyUrl = `http://localhost:3001/api/pvgis?url=${encodeURIComponent(urlPVGIS)}`;
-// Résultat : http://localhost:3001/api/pvgis?url=https%3A%2F%2Fre.jrc.ec.europa.eu%2Fapi%2FPVcalc%3Flat%3D-21.1151%26lon%3D55.5364%26raddatabase%3DPVGIS-ERA5%26peakpower%3D6%26loss%3D14%26angle%3D20%26aspect%3D0%26outputformat%3Djson
+// const proxyUrl = `https://pvgis-proxy-next-clean.vercel.app/api/pvgis?url=${encodeURIComponent(urlPVGIS)}`;
+// Résultat : https://pvgis-proxy-next-clean.vercel.app/api/pvgis?url=https%3A%2F%2Fre.jrc.ec.europa.eu%2Fapi%2FPVcalc%3Flat%3D-21.1151%26lon%3D55.5364%26raddatabase%3DPVGIS-ERA5%26peakpower%3D6%26loss%3D14%26angle%3D20%26aspect%3D0%26outputformat%3Djson
 
   // Permet de placer le marqueur sur la carte au clic
   function MapClickHandler() {
@@ -982,7 +988,7 @@ function Calculateur() {
         const azimut = orientationAzimut[orientation] ?? 180;
         const angle = inclinaison;
         let url = `https://re.jrc.ec.europa.eu/api/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-ERA5&peakpower=${kw}&loss=14&angle=${angle}&aspect=${azimut}&outputformat=json`;
-        let proxyUrl = `http://localhost:3001/api/pvgis?url=${encodeURIComponent(url)}`;
+        let proxyUrl = `https://pvgis-proxy-next-clean.vercel.app/api/pvgis?url=${encodeURIComponent(url)}`;
         let res, kwh;
         console.log('PVGIS URL:', url);
         try {
@@ -1007,7 +1013,7 @@ function Calculateur() {
         } catch (err) {
           // Si PVcalc échoue, tente v5_2/PVcalc
           url = `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-ERA5&peakpower=${kw}&loss=14&angle=${angle}&aspect=${azimut}&outputformat=json`;
-          proxyUrl = `http://localhost:3001/api/pvgis?url=${encodeURIComponent(url)}`;
+          proxyUrl = `https://pvgis-proxy-next-clean.vercel.app/api/pvgis?url=${encodeURIComponent(url)}`;
           console.log('PVGIS fallback URL:', url);
           try {
             res = await axios.get(proxyUrl);
