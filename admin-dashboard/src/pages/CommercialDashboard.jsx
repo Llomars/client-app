@@ -704,7 +704,7 @@ export default function CommercialDashboard() {
   ];
 
   if (!user) return <p>Veuillez vous connecter pour voir votre dashboard.</p>;
-  if (role !== 'commercial' && role !== 'admin')
+  if (role !== 'commercial' && role !== 'admin' && role !== 'manager')
     return <p>Accès refusé : rôle invalide ou manquant.</p>;
 
   return (
@@ -979,13 +979,13 @@ export default function CommercialDashboard() {
 
               {clientListType === 'mesClients' && (
                 <div style={{ marginBottom: 20 }}>
-                  <div style={{ display: 'flex', gap: 10, marginBottom: '12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: '12px', maxWidth: 700 }}>
                     <input
                       placeholder="🔍 Rechercher par nom"
                       value={searchName}
                       onChange={(e) => setSearchName(e.target.value)}
                       style={{
-                        flex: 1,
+                        gridColumn: '1 / 3',
                         padding: 8,
                         borderRadius: 4,
                         border: '1px solid #ddd',
@@ -995,6 +995,7 @@ export default function CommercialDashboard() {
                       value={statutFilter}
                       onChange={(e) => setStatutFilter(e.target.value)}
                       style={{
+                        gridColumn: '1 / 3',
                         padding: 8,
                         borderRadius: 4,
                         border: '1px solid #ddd',
@@ -1015,7 +1016,7 @@ export default function CommercialDashboard() {
                       'adresse',
                       'codePostal',
                       'prixCentrale',
-                    ].map((field) => (
+                    ].map((field, idx) => (
                       <input
                         key={field}
                         placeholder={field}
@@ -1104,6 +1105,7 @@ export default function CommercialDashboard() {
                     <button
                       onClick={() => handleSave()}
                       style={{
+                        gridColumn: '1 / 3',
                         padding: '8px 16px',
                         background: '#10b981',
                         color: '#fff',
