@@ -456,11 +456,15 @@ export default function CommercialDashboard() {
 
   useEffect(() => {
     setFilteredClients(
-      clients.filter(
-        (c) =>
+      clients.filter((c) => {
+        if (typeof c.statut !== 'string') {
+          console.log('[DEBUG statut filtrage]', c.nom, c.statut, typeof c.statut);
+        }
+        return (
           c.nom?.toLowerCase().includes(searchName.toLowerCase()) &&
           (statutFilter ? c.statut === statutFilter : true)
-      )
+        );
+      })
     );
   }, [clients, searchName, statutFilter]);
 
@@ -471,7 +475,7 @@ export default function CommercialDashboard() {
       where('mois', '==', selectedMonth)
     );
     const unsub = onSnapshot(q, (snap) => {
-      const arr = snap.docs.map((d) => d.data());
+      const arr = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       const sorted = [...arr].sort((a, b) => b.totalCA - a.totalCA);
       setAllVendeurs(sorted);
       setTopVendeurs(sorted.slice(0, 5));
@@ -529,14 +533,27 @@ export default function CommercialDashboard() {
       emailCommercial: user.email,
       createdAt: Timestamp.now(),
     });
+    // On attend que Firestore rafraîchisse la liste, donc on reset l'édition et le formulaire
+    setEditingId(null);
     resetForm();
   };
 
   const handleUpdateClient = async (id) => {
-    await updateDoc(doc(db, 'clients', id), {
-      ...newClient,
-      prixCentrale: parseFloat(newClient.prixCentrale || '0'),
+    if (!id || typeof id !== 'string' || id.trim() === '') {
+      console.error('[ERREUR] ID client invalide pour update:', id);
+      alert('Erreur : ID client manquant ou invalide. Impossible de mettre à jour.');
+      return;
+    }
+    const safeClient = {};
+    Object.keys(newClient).forEach(k => {
+      if (k === 'prixCentrale') {
+        safeClient[k] = parseFloat(newClient[k] || '0');
+      } else {
+        safeClient[k] = newClient[k] !== undefined && newClient[k] !== null ? String(newClient[k]) : '';
+      }
     });
+    console.log('[DEBUG client avant update]', safeClient);
+    await updateDoc(doc(db, 'clients', id), safeClient);
     resetForm();
     setEditingId(null);
   };
@@ -566,6 +583,7 @@ export default function CommercialDashboard() {
   };
 
   const handleEditClick = (client) => {
+    console.log('[DEBUG handleEditClick] client.id =', client.id, client);
     setEditingId(client.id);
     setNewClient({
       civilite: client.civilite || '',
@@ -1264,12 +1282,14 @@ export default function CommercialDashboard() {
                           {clientListType === 'mesClients' ? (
                             editingId === c.id ? (
                               <div key="editing-buttons">
-                                <button
-                                  onClick={() => handleUpdateClient(c.id)}
-                                  style={actionBtnStyle.green}
-                                >
-                                  💾 Sauver
-                                </button>
+                                {c.id && typeof c.id === 'string' && c.id.trim() !== '' && (
+                                  <button
+                                    onClick={() => handleUpdateClient(c.id)}
+                                    style={actionBtnStyle.green}
+                                  >
+                                    💾 Sauver
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => {
                                     setEditingId(null);
