@@ -603,8 +603,11 @@ function Calculateur() {
   useEffect(() => {
     if (authChecked) {
       const allowedRoles = ['admin', 'manager', 'commercial', 'phoneur'];
-      if (!user || !allowedRoles.includes(role)) {
-        navigate('/'); // Redirect to home or login
+      // Ne redirige que si le rôle est bien défini (évite écran blanc)
+      if (!user) {
+        navigate('/');
+      } else if (role !== null && !allowedRoles.includes(role)) {
+        navigate('/');
       }
     }
   }, [authChecked, user, role, navigate]);
