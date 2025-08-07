@@ -566,6 +566,7 @@ function Calculateur() {
   const [gainRevente, setGainRevente] = useState(0);
   const [eco, setEco] = useState(0);
   const [rentabilite, setRentabilite] = useState([]);
+  const [modeAugmentation, setModeAugmentation] = useState(true); // true = avec augmentation, false = sans
   const [loadingPVGIS, setLoadingPVGIS] = useState(false);
   const [pvError, setPvError] = useState('');
 
@@ -650,7 +651,7 @@ function Calculateur() {
       setRentabilite([]);
       return;
     }
-    const prixEdfBase = 0.22; // €/kWh (tarif Réunion 2025)
+    const prixEdfBase = 0.25; // €/kWh (tarif Réunion 2025, MAJ)
     let prixEdf = prixEdfBase;
     const rows = [];
     // Détermine le prix de revente selon le kit
@@ -709,10 +710,10 @@ function Calculateur() {
         mensualiteEdf,
         mensualiteCentrale
       });
-      prixEdf *= 1.05;
+      prixEdf *= modeAugmentation ? 1.05 : 1.0;
     }
     setRentabilite(rows);
-  }, [prodMoyenneKwh, conso, prixNet, mensualite, mois, montantFinance, tauxEffectif, prime, kit]);
+  }, [prodMoyenneKwh, conso, prixNet, mensualite, mois, montantFinance, tauxEffectif, prime, kit, modeAugmentation]);
 
   // Requête PVGIS à chaque changement de coords ou kit
   useEffect(() => {
@@ -884,7 +885,7 @@ function Calculateur() {
       setRentabilite([]);
       return;
     }
-    const prixEdfBase = 0.22; // €/kWh (tarif Réunion 2025)
+    const prixEdfBase = 0.25; // €/kWh (tarif Réunion 2025, MAJ)
     let prixEdf = prixEdfBase;
     const rows = [];
     // Détermine le prix de revente selon le kit
@@ -1327,7 +1328,28 @@ function Calculateur() {
                 boxShadow: '0 2px 8px #e0e7ff',
                 outline: 'none',
                 transition: 'border 0.2s'
-              }} />
+              }}
+              onBlur={async (e) => {
+                const value = e.target.value;
+                if (value && value.length > 5) {
+                  setLoadingAdresse(true);
+                  setAdresseError('');
+                  try {
+                    const res = await axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(value)}`);
+                    if (res.data && res.data.length > 0) {
+                      const { lat, lon, display_name } = res.data[0];
+                      setCoords({ lat: parseFloat(lat), lng: parseFloat(lon) });
+                      setAdresse(display_name);
+                    } else {
+                      setAdresseError('Adresse non trouvée');
+                    }
+                  } catch (err) {
+                    setAdresseError('Erreur de géolocalisation');
+                  }
+                  setLoadingAdresse(false);
+                }
+              }}
+            />
               {adresseError && <span style={{ color: '#dc2626', marginLeft: 4, fontWeight: 700 }}>{adresseError}</span>}
             </div>
           </div>
@@ -1364,7 +1386,39 @@ function Calculateur() {
           {/* Bloc supprimé : résultats détaillés sous la carte, on garde seulement les 4 cases infos clés */}
           {/* Tableau de rentabilité sur 20 ans */}
           <div style={{ marginTop: 24 }}>
-            <h4 style={{ color: '#3730a3', fontWeight: 700, fontSize: 20 }}>Tableau de rentabilité (20 ans)</h4>
+            <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+              <button
+                onClick={() => setModeAugmentation(true)}
+                style={{
+                  background: modeAugmentation ? '#6366f1' : '#e0e7ff',
+                  color: modeAugmentation ? '#fff' : '#6366f1',
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '10px 24px',
+                  fontWeight: 800,
+                  fontSize: 16,
+                  cursor: 'pointer',
+                  boxShadow: modeAugmentation ? '0 2px 8px #c7d2fe' : 'none'
+                }}
+              >Avec augmentation</button>
+              <button
+                onClick={() => setModeAugmentation(false)}
+                style={{
+                  background: !modeAugmentation ? '#6366f1' : '#e0e7ff',
+                  color: !modeAugmentation ? '#fff' : '#6366f1',
+                  border: 'none',
+                  borderRadius: 8,
+                  padding: '10px 24px',
+                  fontWeight: 800,
+                  fontSize: 16,
+                  cursor: 'pointer',
+                  boxShadow: !modeAugmentation ? '0 2px 8px #c7d2fe' : 'none'
+                }}
+              >Sans augmentation</button>
+            </div>
+            <h4 style={{ color: '#3730a3', fontWeight: 700, fontSize: 20 }}>
+              Tableau de rentabilité (20 ans) {modeAugmentation ? 'avec augmentation' : 'sans augmentation'}
+            </h4>
             <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 10, overflow: 'hidden', boxShadow: '0 2px 8px #e0e7ff' }}>
               <thead>
                 <tr style={{ background: '#c7d2fe' }}>

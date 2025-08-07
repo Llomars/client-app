@@ -1,6 +1,7 @@
 import React from 'react';
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom';
 import Header from './components/Header';
+import Home from './pages/Home';
 import Clients from './pages/Clients';
 import CommercialDashboard from './pages/CommercialDashboard';
 import Parrainages from './pages/Parrainages';
@@ -23,6 +24,7 @@ export default function App() {
     <Router>
       <Header />
       <Routes>
+        <Route path="/" element={<Home />} />
         <Route path="/clients" element={<Clients />} />
         <Route path="/dashboard" element={<CommercialDashboard />} />
         <Route path="/parrainages" element={<Parrainages />} />
