@@ -539,10 +539,17 @@ export default function CommercialDashboard() {
   };
 
   const handleUpdateClient = async (id) => {
-    if (!id || typeof id !== 'string' || id.trim() === '') {
-      console.error('[ERREUR] ID client invalide pour update:', id);
-      alert('Erreur : ID client manquant ou invalide. Impossible de mettre à jour.');
-      return;
+    // Si l'ID est manquant, on le retrouve dans le tableau clients par email
+    let clientId = id;
+    if (!clientId || typeof clientId !== 'string' || clientId.trim() === '') {
+      const found = clients.find(c => c.email === newClient.email);
+      if (found && found.id) {
+        clientId = found.id;
+      } else {
+        console.error('[ERREUR] Impossible de retrouver l\'ID client pour update:', newClient.email);
+        alert('Erreur : ID client manquant ou invalide. Impossible de mettre à jour.');
+        return;
+      }
     }
     const safeClient = {};
     Object.keys(newClient).forEach(k => {
@@ -553,7 +560,7 @@ export default function CommercialDashboard() {
       }
     });
     console.log('[DEBUG client avant update]', safeClient);
-    await updateDoc(doc(db, 'clients', id), safeClient);
+    await updateDoc(doc(db, 'clients', clientId), safeClient);
     resetForm();
     setEditingId(null);
   };
