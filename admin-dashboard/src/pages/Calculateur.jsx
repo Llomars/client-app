@@ -529,6 +529,7 @@ function Calculateur() {
   // --- HOOKS AUTH ---
   const [authChecked, setAuthChecked] = useState(false);
   const [user, setUser] = useState(null);
+  const [role, setRole] = useState(null);
   const navigate = useNavigate();
 
   // --- TOUS LES AUTRES HOOKS (états/metiers) ---
@@ -586,12 +587,27 @@ function Calculateur() {
   // --- useEffects ---
   useEffect(() => {
     const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       setAuthChecked(true);
+      if (firebaseUser) {
+        const idTokenResult = await firebaseUser.getIdTokenResult();
+        setRole(idTokenResult.claims.role || null);
+      } else {
+        setRole(null);
+      }
     });
     return () => unsubscribe();
   }, []);
+  // --- Access control: only allow certain roles ---
+  useEffect(() => {
+    if (authChecked) {
+      const allowedRoles = ['admin', 'manager', 'commercial', 'phoneur'];
+      if (!user || !allowedRoles.includes(role)) {
+        navigate('/'); // Redirect to home or login
+      }
+    }
+  }, [authChecked, user, role, navigate]);
 
   // Met à jour prix centrale, prix net, montant à financer, prime et gain revente (surplus, bon tarif) quand kit/remise change
   useEffect(() => {

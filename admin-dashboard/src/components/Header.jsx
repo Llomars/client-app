@@ -68,6 +68,7 @@ export default function Header() {
             🏠 Mon Dashboard
           </Link>
 
+          {/* Liens admin */}
           {role === 'admin' && (
             <>
               <Link
@@ -96,35 +97,38 @@ export default function Header() {
               >
                 🛠️ SAV
               </Link>
-          <Link
-            to="/logistique"
-            style={{
-              background: '#6366f1',
-              padding: '8px 16px',
-              borderRadius: '8px',
-              textDecoration: 'none',
-              color: '#fff',
-              fontWeight: '500',
-            }}
-          >
-            🚚 Logistique
-          </Link>
-          <Link
-            to="/calculateur"
-            style={{
-              background: '#f43f5e',
-              padding: '8px 16px',
-              borderRadius: '8px',
-              color: '#fff',
-              fontWeight: '500',
-              textDecoration: 'none',
-              border: 'none',
-              cursor: 'pointer',
-            }}
-          >
-            📊 Calculateur
-          </Link>
+              <Link
+                to="/logistique"
+                style={{
+                  background: '#6366f1',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  textDecoration: 'none',
+                  color: '#fff',
+                  fontWeight: '500',
+                }}
+              >
+                🚚 Logistique
+              </Link>
             </>
+          )}
+          {/* Lien Calculateur pour tous les rôles autorisés */}
+          {['admin', 'manager', 'commercial', 'phoneur'].includes(role) && (
+            <Link
+              to="/calculateur"
+              style={{
+                background: '#f43f5e',
+                padding: '8px 16px',
+                borderRadius: '8px',
+                color: '#fff',
+                fontWeight: '500',
+                textDecoration: 'none',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              📊 Calculateur
+            </Link>
           )}
 
           <button
