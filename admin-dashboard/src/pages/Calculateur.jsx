@@ -21,59 +21,75 @@ function Calculateur() {
   useEffect(() => {
     if (!window.petalesPngDataUrl) {
       fetch('/Pétales.png')
-        .then(res => res.blob())
+        .then(res => {
+          if (!res.ok) throw new Error('Image pétales non trouvée');
+          return res.blob();
+        })
         .then(blob => {
           const reader = new window.FileReader();
           reader.onloadend = () => {
             window.petalesPngDataUrl = reader.result;
           };
           reader.readAsDataURL(blob);
+        })
+        .catch(() => {
+          window.petalesPngDataUrl = null;
         });
     }
   }, []);
   useEffect(() => {
     if (!window.backendPngDataUrl) {
       fetch('/Backend2.png')
-        .then(res => res.blob())
+        .then(res => {
+          if (!res.ok) throw new Error('Image backend non trouvée');
+          return res.blob();
+        })
         .then(blob => {
           const reader = new window.FileReader();
           reader.onloadend = () => {
             window.backendPngDataUrl = reader.result;
           };
           reader.readAsDataURL(blob);
+        })
+        .catch(() => {
+          window.backendPngDataUrl = null;
         });
     }
   }, []);
 
   // --- Génération PDF quali ---
-  const handleGeneratePDF = async (previewOnly = false) => {
+  const handleGeneratePDF = async (previewOnly = false, includeDevis = includeDevisInPreview) => {
     setPdfLoading(true);
     try {
       const docPdf = new jsPDF();
       // --- Ajout logo société en base64 (DataURL) ---
       const getBase64FromUrl = async (url) => {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error('Logo non trouvé');
-        const blob = await response.blob();
-        return new Promise((resolve, reject) => {
-          const reader = new window.FileReader();
-          reader.onloadend = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
+        try {
+          const response = await fetch(url);
+          if (!response.ok) throw new Error('Logo non trouvé');
+          const blob = await response.blob();
+          return new Promise((resolve, reject) => {
+            const reader = new window.FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+        } catch (e) {
+          return null;
+        }
       };
       let logoDataUrl = null;
       let logoWidth = 70; // Agrandi
       let logoHeight = 40;
       let logoX = 10;
       let logoY = 10;
-      try {
-        logoDataUrl = await getBase64FromUrl('/logopdf.png');
+      logoDataUrl = await getBase64FromUrl('/logopdf.png');
+      if (logoDataUrl) {
         docPdf.addImage(logoDataUrl, 'PNG', logoX, logoY, logoWidth, logoHeight);
-      } catch (e) {
-        // logo non chargé
       }
       // Image pétales en bas à droite
+      // ... tous les éléments de la page ...
+      // Ajout pétales au premier plan en bas à droite
       if (window.petalesPngDataUrl) {
         docPdf.addImage(window.petalesPngDataUrl, 'PNG', 120, 235, 90, 60);
       }
@@ -163,20 +179,21 @@ function Calculateur() {
         const totalEdfSynth = rentabilite.reduce((acc, row) => acc + (row.coutEdf || 0), 0);
         const synthHeight = 277 - synthY;
         if (typeof synthY === 'number' && !isNaN(synthY) && typeof synthHeight === 'number' && !isNaN(synthHeight)) {
-          if (window.backendPngDataUrl) {
-            docPdf.saveGraphicsState();
-            docPdf.setDrawColor(0, 0, 0);
-            docPdf.setLineWidth(4);
-            docPdf.rect(10, synthY, 190, synthHeight, 'S');
-            docPdf.rect(10, synthY, 190, synthHeight);
-            docPdf.clip();
-            docPdf.addImage(window.backendPngDataUrl, 'PNG', 10, synthY, 190, synthHeight);
-            docPdf.restoreGraphicsState();
-            docPdf.setLineWidth(0.2);
-          } else {
-            docPdf.setFillColor(255,255,255);
-            docPdf.rect(10, synthY, 190, synthHeight, 'F');
-          }
+        if (window.backendPngDataUrl) {
+          docPdf.setDrawColor(0, 0, 0);
+          docPdf.setLineWidth(4);
+          docPdf.rect(10, synthY, 190, synthHeight, 'S');
+          docPdf.rect(10, synthY, 190, synthHeight);
+          docPdf.addImage(window.backendPngDataUrl, 'PNG', 10, synthY, 190, synthHeight);
+          docPdf.setLineWidth(0.2);
+        } else {
+          docPdf.setFillColor(255,255,255);
+          docPdf.rect(10, synthY, 190, synthHeight, 'F');
+        }
+      // Ajout pétales au premier plan en bas à droite (après tous les autres éléments)
+      if (window.petalesPngDataUrl) {
+        docPdf.addImage(window.petalesPngDataUrl, 'PNG', 120, 235, 90, 60);
+      }
         } else {
           docPdf.setFillColor(255,255,255);
           docPdf.rect(10, 40, 190, 100, 'F');
@@ -252,8 +269,10 @@ function Calculateur() {
         docPdf.roundedRect(col2X, rowY, blockW, blockH, blockR, blockR);
         docPdf.setLineWidth(0.2);
         docPdf.setFont('helvetica', 'bold');
+        docPdf.setFontSize(12);
+        docPdf.text('Coût total EDF', col2X + blockW/2, rowY+13, { align: 'center' });
         docPdf.setFontSize(16);
-        docPdf.text(`${totalEdfSynth} €`, col2X + blockW/2, rowY+16, { align: 'center' });
+        docPdf.text(`${totalEdfSynth} €`, col2X + blockW/2, rowY+22, { align: 'center' });
       }
       // PAGE 2 : Tableau de rentabilité complet (20 ans)
       docPdf.addPage();
@@ -321,7 +340,10 @@ function Calculateur() {
 
       // PAGE 3 : Conseils, Contact, Graphique
       docPdf.addPage();
-      // Logo uniquement sur la première page (ne pas ajouter ici)
+      // Ajout pétales sur la troisième page
+      if (window.petalesPngDataUrl) {
+        docPdf.addImage(window.petalesPngDataUrl, 'PNG', 120, 235, 90, 60);
+      }
       docPdf.setFillColor(255, 214, 224, 0.85);
       docPdf.rect(0, 10, 210, 16, 'F');
       docPdf.setDrawColor(255, 214, 224);
@@ -476,6 +498,202 @@ function Calculateur() {
       } catch (e) {}
       // --- Fin page 3 ---
       // --- Fin page 3 ---
+      // --- PAGE 4 : Devis personnalisé ---
+      if (includeDevis) {
+        docPdf.addPage();
+        // --- En-tête ---
+        // Ajout pétales sur la quatrième page
+        if (window.petalesPngDataUrl) {
+          docPdf.addImage(window.petalesPngDataUrl, 'PNG', 120, 235, 90, 60);
+        }
+        if (window.logoPngDataUrl) {
+          docPdf.addImage(window.logoPngDataUrl, 'PNG', 15, 10, 40, 18);
+        }
+        docPdf.setFont('helvetica', 'bold');
+        docPdf.setFontSize(20);
+        docPdf.setTextColor(30, 64, 175);
+        docPdf.text('Devis personnalisé', 60, 25);
+        docPdf.setFont('helvetica', 'normal');
+        docPdf.setFontSize(12);
+        docPdf.setTextColor(99, 102, 241);
+        docPdf.text('Date : ' + new Date().toLocaleDateString(), 150, 25);
+
+        // --- Bloc infos client/conseiller ---
+        docPdf.setFillColor(255,255,255);
+        docPdf.roundedRect(15, 35, 180, 36, 6, 6, 'F');
+        docPdf.setDrawColor(0,0,0);
+        docPdf.roundedRect(15, 35, 180, 36, 6, 6);
+        docPdf.setFont('helvetica', 'bold');
+        docPdf.setFontSize(13);
+        docPdf.setTextColor(30, 64, 175);
+        docPdf.text('Nom :', 20, 46);
+        docPdf.setFont('helvetica', 'normal');
+        docPdf.setTextColor(0,0,0);
+        docPdf.text(selectedClient && selectedClient.nom ? selectedClient.nom : '-', 45, 46, {maxWidth: 60});
+        docPdf.setFont('helvetica', 'bold');
+        docPdf.setTextColor(30, 64, 175);
+        docPdf.text('Prénom :', 110, 46);
+        docPdf.setFont('helvetica', 'normal');
+        docPdf.setTextColor(0,0,0);
+        docPdf.text(selectedClient && selectedClient.prenom ? selectedClient.prenom : '-', 145, 46, {maxWidth: 50});
+        docPdf.setFont('helvetica', 'bold');
+        docPdf.setTextColor(30, 64, 175);
+        docPdf.text('Adresse mail :', 20, 54);
+        docPdf.setFont('helvetica', 'normal');
+      }
+      docPdf.setTextColor(0,0,0);
+      docPdf.text(selectedClient && selectedClient.email ? selectedClient.email : '-', 65, 54, {maxWidth: 90});
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.setTextColor(30, 64, 175);
+      docPdf.text('Numéro de tél :', 110, 54);
+      docPdf.setFont('helvetica', 'normal');
+      docPdf.setTextColor(0,0,0);
+      docPdf.text(selectedClient && selectedClient.tel ? selectedClient.tel : '-', 155, 54, {maxWidth: 40});
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.setTextColor(30, 64, 175);
+      docPdf.text('Conseiller :', 20, 66);
+      docPdf.setFont('helvetica', 'normal');
+      docPdf.setTextColor(0,0,0);
+      docPdf.text(user && user.displayName ? user.displayName : '-', 45, 66, {maxWidth: 60});
+
+      // --- Bloc projet supprimé (déjà présent en page 1) ---
+
+      // --- Tableau financier ---
+let yTab = 80; // Décalé pour éviter chevauchement avec le cadre infos client/conseiller
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.setFontSize(14);
+      docPdf.setTextColor(30, 64, 175);
+      docPdf.text('Détail financier', 15, yTab);
+      yTab += 6;
+      docPdf.setFont('helvetica', 'normal');
+      docPdf.setFontSize(12);
+      docPdf.setTextColor(0,0,0);
+      docPdf.setFillColor(255,255,255);
+      docPdf.roundedRect(15, yTab, 180, 36, 6, 6, 'F');
+      docPdf.setDrawColor(0,0,0);
+      docPdf.roundedRect(15, yTab, 180, 36, 6, 6);
+      let yRow = yTab + 10;
+      docPdf.text('Prix centrale :', 20, yRow);
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.text(prixCentrale ? prixCentrale + ' €' : '-', 65, yRow, {maxWidth: 40});
+      docPdf.setFont('helvetica', 'normal');
+      docPdf.text('Remise :', 110, yRow);
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.text(remise ? remise + ' €' : '-', 155, yRow, {maxWidth: 40});
+      yRow += 8;
+      docPdf.setFont('helvetica', 'normal');
+      docPdf.text('Montant financé :', 20, yRow);
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.text(montantFinance ? montantFinance + ' €' : '-', 65, yRow, {maxWidth: 40});
+      docPdf.setFont('helvetica', 'normal');
+      docPdf.text('Banque :', 110, yRow);
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.text(banque ? banque : '-', 155, yRow, {maxWidth: 40});
+      yRow += 8;
+      docPdf.setFont('helvetica', 'normal');
+      docPdf.text('Apport :', 20, yRow);
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.text(apport ? apport + ' €' : '-', 65, yRow, {maxWidth: 40});
+      docPdf.setFont('helvetica', 'normal');
+      docPdf.text('Durée :', 110, yRow);
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.text(mois ? mois + ' mois' : '-', 155, yRow, {maxWidth: 40});
+      yRow += 8;
+      docPdf.setFont('helvetica', 'normal');
+      docPdf.text('Mensualité :', 20, yRow);
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.text(mensualite ? mensualite + ' €' : '-', 65, yRow, {maxWidth: 40});
+
+      // --- Composition du kit ---
+let yKit = yRow + 12; // Remonté pour une meilleure disposition
+      let kitBoxX = 18, kitBoxY = yKit, kitBoxW = 175, kitBoxH = 85;
+      docPdf.setDrawColor(0,0,0);
+      docPdf.setLineWidth(1);
+      docPdf.roundedRect(kitBoxX, kitBoxY, kitBoxW, kitBoxH, 8, 8); // Contour uniquement
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.setFontSize(13);
+      docPdf.setTextColor(30, 64, 175);
+      docPdf.text('Composition du kit', kitBoxX + 6, kitBoxY + 10);
+      // Récupère la composition du kit sélectionné
+      const selectedKitObj = kits.find(k => k.value === kit);
+      const kitDetails = selectedKitObj && selectedKitObj.composition ? selectedKitObj.composition : [
+        'Panneaux de 500W',
+        'Batterie',
+        'Onduleur',
+        'Boitier BMS',
+        'Système Monitoring',
+        'Rails et visseries',
+        'Clé wifi',
+        'Câbles solaires',
+        'Raccordement',
+        'Déclaration Préalable des travaux',
+        'Installation'
+      ];
+      docPdf.setFont('helvetica', 'normal');
+      docPdf.setFontSize(11);
+      docPdf.setTextColor(0,0,0);
+      let yKitDetails = kitBoxY + 18;
+      kitDetails.forEach((item, idx) => {
+        docPdf.text('• ' + item, kitBoxX + 8, yKitDetails + idx*6, {maxWidth: kitBoxW - 16});
+        if (idx < kitDetails.length - 1) {
+          // Ligne séparatrice
+          docPdf.setDrawColor(220,220,220);
+          docPdf.setLineWidth(0.5);
+          docPdf.line(kitBoxX + 8, yKitDetails + idx*6 + 2.5, kitBoxX + kitBoxW - 8, yKitDetails + idx*6 + 2.5);
+        }
+      });
+      // Prix centrale dans un petit cadre, aligné à droite sous le cadre du kit
+      let priceBoxW = 70, priceBoxH = 16;
+      let priceBoxX = kitBoxX + kitBoxW - priceBoxW;
+let priceBoxY = kitBoxY + kitBoxH; // Position intermédiaire, légèrement plus bas
+      docPdf.setDrawColor(0,0,0);
+      docPdf.setLineWidth(0.8);
+      docPdf.roundedRect(priceBoxX, priceBoxY, priceBoxW, priceBoxH, 5, 5); // Contour uniquement
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.setFontSize(12);
+      docPdf.setTextColor(30, 64, 175);
+      docPdf.text('Prix à payer :', priceBoxX + 6, priceBoxY + 11);
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.setFontSize(12);
+      docPdf.setTextColor(0,0,0);
+      let prixAPayer = (prixCentrale && remise) ? (prixCentrale - remise) : prixCentrale;
+      docPdf.text(prixAPayer ? prixAPayer + ' €' : '-', priceBoxX + priceBoxW - 6, priceBoxY + 11, {align: 'right'});
+
+      // --- Cadre signature client en bas à droite ---
+      // --- Cadre signature client en bas à droite ---
+      let signBoxY = 250;
+      let signBoxW = 70, signBoxH = 25;
+      docPdf.setDrawColor(0,0,0);
+      docPdf.setLineWidth(0.8);
+      docPdf.roundedRect(135, signBoxY, signBoxW, signBoxH, 6, 6);
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.setFontSize(12);
+      docPdf.setTextColor(30, 64, 175);
+      docPdf.text('Signature client', 138, signBoxY+8);
+      // Mention sous le cadre signature client (à droite)
+      docPdf.setFont('helvetica', 'normal');
+      docPdf.setFontSize(10);
+      docPdf.setTextColor(0,0,0);
+      docPdf.text('écrire : date et lieu "Lu et approuvé, bon pour commande"', 138, signBoxY+signBoxH+6, {maxWidth: 65});
+
+      // --- Cadre signature entreprise en bas à gauche ---
+      // Mention sous le cadre signature entreprise (à gauche)
+      docPdf.setFont('helvetica', 'normal');
+      docPdf.setFontSize(10);
+      docPdf.setTextColor(0,0,0);
+      docPdf.text('Sous réserve d\'accord technique, administrative et financière', 18, signBoxY+signBoxH+6, {maxWidth: 65});
+      docPdf.setDrawColor(0,0,0);
+      docPdf.setLineWidth(0.8);
+      docPdf.roundedRect(15, signBoxY, signBoxW, signBoxH, 6, 6);
+      docPdf.setFont('helvetica', 'bold');
+      docPdf.setFontSize(12);
+      docPdf.setTextColor(30, 64, 175);
+      docPdf.text('Signature entreprise', 18, signBoxY+8);
+
+
+      // --- PAGE 5 : Page de signature ---
+
+      // --- Fin devis et signature pages ---
       if (previewOnly) {
         const pdfBlob = docPdf.output('blob');
         const url = URL.createObjectURL(pdfBlob);
@@ -504,16 +722,135 @@ function Calculateur() {
     { nom: 'La banque postale', taux: 2.3, dureeMax: 140 },
   ];
   const kits = [
-    { label: '3 KWh 0', value: '3KWh-0', prix: 7500, prime: 4830 },
-    { label: '3 KWh 1', value: '3KWh-1', prix: 9500, prime: 4830 },
-    { label: '6 KWh 0', value: '6KWh-0', prix: 12000, prime: 5760 },
-    { label: '6 KWh 1', value: '6KWh-1', prix: 15000, prime: 5760 },
-    { label: '6 KWh 2', value: '6KWh-2', prix: 16000, prime: 5760 },
-    { label: '9 KWh 0', value: '9KWh-0', prix: 16500, prime: 8640 },
-    { label: '9 KWh 1', value: '9KWh-1', prix: 22000, prime: 8640 },
-    { label: '9 KWh 2', value: '9KWh-2', prix: 24000, prime: 8640 },
-    { label: '12 KWh 0', value: '12KWh-0', prix: 22000, prime: 6840 },
-    { label: '12 KWh 2', value: '12KWh-2', prix: 30000, prime: 6840 },
+    { label: '3 KWh 0', value: '3KWh-0', prix: 7500, prime: 4830, composition: [
+      'Panneaux de 500W x 6',
+      'Onduleur de 3Kwh',
+      'Boitier BMS',
+      'Système Monitoring',
+      'Rails et visseries',
+      'Clé wifi',
+      'Câbles solaires',
+      'Raccordement',
+      'Déclaration Préalable des travaux',
+      'Installation'
+    ] },
+    { label: '3 KWh 1', value: '3KWh-1', prix: 9500, prime: 4830, composition: [
+      'Panneaux de 500W x 6',
+      'Batterie de 5Kwh',
+      'Onduleur de 3Kwh',
+      'Boitier BMS',
+      'Système Monitoring',
+      'Rails et visseries',
+      'Clé wifi',
+      'Câbles solaires',
+      'Raccordement',
+      'Déclaration Préalable des travaux',
+      'Installation'
+    ] },
+    { label: '6 KWh 0', value: '6KWh-0', prix: 12000, prime: 5760, composition: [
+      'Panneaux de 500W x 12',
+      'Onduleur de 6Kwh',
+      'Boitier BMS',
+      'Système Monitoring',
+      'Rails et visseries',
+      'Clé wifi',
+      'Câbles solaires',
+      'Raccordement',
+      'Déclaration Préalable des travaux',
+      'Installation'
+    ] },
+    { label: '6 KWh 1', value: '6KWh-1', prix: 15000, prime: 5760, composition: [
+      'Panneaux de 500W x 12',
+      'Batterie de 5Kwh',
+      'Onduleur de 6Kwh',
+      'Boitier BMS',
+      'Système Monitoring',
+      'Rails et visseries',
+      'Clé wifi',
+      'Câbles solaires',
+      'Raccordement',
+      'Déclaration Préalable des travaux',
+      'Installation'
+    ] },
+    { label: '6 KWh 2', value: '6KWh-2', prix: 16000, prime: 5760, composition: [
+      'Panneaux de 500W x 12',
+      'Batterie de 10Kwh',
+      'Onduleur de 6Kwh',
+      'Boitier BMS',
+      'Système Monitoring',
+      'Rails et visseries',
+      'Clé wifi',
+      'Câbles solaires',
+      'Raccordement',
+      'Déclaration Préalable des travaux',
+      'Installation'
+    ] },
+    { label: '9 KWh 0', value: '9KWh-0', prix: 16500, prime: 8640, composition: [
+      'Panneaux de 500W x 18',
+      'Onduleur de 6Kwh',
+      'Onduleur de 3Kwh',
+      'Boitier BMS',
+      'Système Monitoring',
+      'Rails et visseries',
+      'Clé wifi',
+      'Câbles solaires',
+      'Raccordement',
+      'Déclaration Préalable des travaux',
+      'Installation'
+    ] },
+    { label: '9 KWh 1', value: '9KWh-1', prix: 22000, prime: 8640, composition: [
+      'Panneaux de 500W x 18',
+      'Batterie de 5Kwh',
+      'Onduleur de 6Kwh',
+      'Onduleur de 3Kwh',
+      'Boitier BMS',
+      'Système Monitoring',
+      'Rails et visseries',
+      'Clé wifi',
+      'Câbles solaires',
+      'Raccordement',
+      'Déclaration Préalable des travaux',
+      'Installation'
+    ] },
+    { label: '9 KWh 2', value: '9KWh-2', prix: 24000, prime: 8640, composition: [
+      'Panneaux de 500W x 18',
+      'Batterie de 10Kwh',
+      'Onduleur de 6Kwh',
+      'Onduleur de 3Kwh',
+      'Boitier BMS',
+      'Système Monitoring',
+      'Rails et visseries',
+      'Clé wifi',
+      'Câbles solaires',
+      'Raccordement',
+      'Déclaration Préalable des travaux',
+      'Installation'
+    ] },
+    { label: '12 KWh 0', value: '12KWh-0', prix: 22000, prime: 6840, composition: [
+      'Panneaux de 500W x 24',
+      'Onduleur de 6Kwh x 2',
+      'Boitier BMS',
+      'Système Monitoring',
+      'Rails et visseries',
+      'Clé wifi',
+      'Câbles solaires',
+      'Raccordement',
+      'Déclaration Préalable des travaux',
+      'Installation'
+    ] },
+    { label: '12 KWh 2', value: '12KWh-2', prix: 30000, prime: 6840, composition: [
+      'Panneaux de 500W x 24',
+      'Batterie de 10KWh',
+      'Onduleur de 6Kwh x 2',
+      'Boitier BMS',
+      'Système Monitoring',
+      'Rails et visseries',
+      'Clé wifi',
+      'Câbles solaires',
+      'Raccordement',
+      'Déclaration Préalable des travaux',
+      'Installation'
+    ] },
   ];
   const orientationAzimut = {
     'Sud': 0,
@@ -536,6 +873,7 @@ function Calculateur() {
   // (ne rien déplacer du contenu métier, tout reste ici)
   // Place all useState/useEffect hooks here, before any return or conditional
   const [showPdfPreview, setShowPdfPreview] = useState(false);
+  const [includeDevisInPreview, setIncludeDevisInPreview] = useState(true);
   const [pdfUrl, setPdfUrl] = useState(null);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [apport, setApport] = useState(0);
@@ -816,6 +1154,12 @@ function Calculateur() {
     // eslint-disable-next-line
   }, [showClientModal]);
 
+  // ...existing code...
+  // Empêche le reload à chaque saisie dans les formulaires
+  const handleInputChange = (setter) => (e) => {
+    e.preventDefault && e.preventDefault();
+    setter(e.target.value);
+  };
   // ...existing code...
 // Exemple d'utilisation :
 // const urlPVGIS = "https://re.jrc.ec.europa.eu/api/PVcalc?lat=-21.1151&lon=55.5364&raddatabase=PVGIS-ERA5&peakpower=6&loss=14&angle=20&aspect=0&outputformat=json";
@@ -1189,6 +1533,9 @@ function Calculateur() {
             <div style={{ marginTop: 18, display: 'flex', gap: 18, justifyContent: 'flex-end' }}>
               <button onClick={() => { setShowPdfPreview(false); setPdfUrl(null); }} style={{ background: '#6366f1', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 800, fontSize: 16, cursor: 'pointer' }}>Fermer</button>
               <button onClick={() => { setShowPdfPreview(false); handleGeneratePDF(false); }} style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 800, fontSize: 16, cursor: 'pointer' }}>Télécharger PDF</button>
+              <button onClick={async () => { setIncludeDevisInPreview(v => { const newVal = !v; setTimeout(() => handleGeneratePDF(true, newVal), 0); return newVal; }); }} style={{ background: includeDevisInPreview ? '#6366f1' : '#e5e7eb', color: includeDevisInPreview ? '#fff' : '#222', border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 800, fontSize: 16, cursor: 'pointer' }}>
+                {includeDevisInPreview ? 'Exclure le devis de l’aperçu' : 'Inclure le devis à l’aperçu'}
+              </button>
             </div>
           </div>
         </div>
