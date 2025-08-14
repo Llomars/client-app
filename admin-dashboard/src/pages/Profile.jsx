@@ -100,6 +100,15 @@ export default function Profile() {
               onChange={(e) => setPassword(e.target.value)}
               style={inputStyle}
             />
+            <div style={{ textAlign: 'right', marginBottom: '8px' }}>
+              <button
+                type="button"
+                onClick={() => window.open('https://www.google.com/search?q=mot+de+passe+oublié+Botaik', '_blank')}
+                style={{ background: 'none', border: 'none', color: '#6366f1', fontSize: '14px', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
+              >
+                Mot de passe oublié ?
+              </button>
+            </div>
             <button onClick={handleLogin} style={btnStyle('#10b981')}>
               ✅ Connexion
             </button>

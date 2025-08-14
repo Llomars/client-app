@@ -38,6 +38,7 @@
     "expo-web-browser": "~14.1.6",
     "express": "^5.1.0",
     "firebase": "^11.9.1",
+    "firebase-admin": "^13.4.0",
     "leaflet": "^1.9.4",
     "react": "19.0.0",
     "react-csv": "^2.2.2",

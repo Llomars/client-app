@@ -152,9 +152,10 @@ export default function Header() {
               padding: '6px 12px',
               borderRadius: '20px',
               fontSize: '14px',
+              marginLeft: '10px',
             }}
           >
-            {user.email}
+            {user.email} <span style={{color:'#f59e0b',marginLeft:6}}>(role: {role || 'aucun'})</span>
           </span>
         </div>
       ) : (
