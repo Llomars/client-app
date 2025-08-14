@@ -60,9 +60,9 @@ function ClientsList() {
         id: doc.id,
         ...doc.data(),
       }));
-      // Filtrer pour ne garder que les clients du commercial connecté
-      if (user) {
-        setClients(data.filter(c => c.uidCommercial === user.uid));
+      // Filtrer pour ne garder que les clients du commercial connecté (par email)
+      if (user && user.email) {
+        setClients(data.filter(c => c.emailCommercial === user.email));
       } else {
         setClients([]);
       }
@@ -77,10 +77,10 @@ function ClientsList() {
       return;
     }
 
-    // Ajoute l'UID du commercial connecté
+    // Ajoute l'email du commercial connecté
     const clientData = { ...form };
-    if (user) {
-      clientData.uidCommercial = user.uid;
+    if (user && user.email) {
+      clientData.emailCommercial = user.email;
     }
 
     if (editingId) {
