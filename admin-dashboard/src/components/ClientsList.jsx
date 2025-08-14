@@ -16,7 +16,7 @@ import RdvNotesList from './RdvNotesList';
 
 function ClientsList() {
   const auth = getAuth();
-  const currentUser = auth.currentUser;
+  const [user, setUser] = useState(null);
   const [clients, setClients] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -46,6 +46,14 @@ function ClientsList() {
   const [ficheClient, setFicheClient] = useState(null);
   const [showRdvNoteForm, setShowRdvNoteForm] = useState(false);
 
+  // Récupère l'utilisateur connecté
+  useEffect(() => {
+    const unsubscribeAuth = auth.onAuthStateChanged((u) => {
+      setUser(u);
+    });
+    return () => unsubscribeAuth();
+  }, [auth]);
+
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'clients'), (snapshot) => {
       const data = snapshot.docs.map((doc) => ({
@@ -53,14 +61,14 @@ function ClientsList() {
         ...doc.data(),
       }));
       // Filtrer pour ne garder que les clients du commercial connecté
-      if (currentUser) {
-        setClients(data.filter(c => c.uidCommercial === currentUser.uid));
+      if (user) {
+        setClients(data.filter(c => c.uidCommercial === user.uid));
       } else {
         setClients([]);
       }
     });
     return () => unsubscribe();
-  }, [currentUser]);
+  }, [user]);
 
   const saveClient = async () => {
     const { nom, prenom, email, telephone } = form;
@@ -71,8 +79,8 @@ function ClientsList() {
 
     // Ajoute l'UID du commercial connecté
     const clientData = { ...form };
-    if (currentUser) {
-      clientData.uidCommercial = currentUser.uid;
+    if (user) {
+      clientData.uidCommercial = user.uid;
     }
 
     if (editingId) {
