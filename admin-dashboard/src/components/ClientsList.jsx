@@ -7,6 +7,7 @@ import {
     updateDoc,
 } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
+import { getAuth } from 'firebase/auth';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { db } from '../firebaseConfig';
@@ -14,6 +15,8 @@ import RdvNoteForm from './RdvNoteForm';
 import RdvNotesList from './RdvNotesList';
 
 function ClientsList() {
+  const auth = getAuth();
+  const currentUser = auth.currentUser;
   const [clients, setClients] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -49,10 +52,15 @@ function ClientsList() {
         id: doc.id,
         ...doc.data(),
       }));
-      setClients(data);
+      // Filtrer pour ne garder que les clients du commercial connecté
+      if (currentUser) {
+        setClients(data.filter(c => c.uidCommercial === currentUser.uid));
+      } else {
+        setClients([]);
+      }
     });
     return () => unsubscribe();
-  }, []);
+  }, [currentUser]);
 
   const saveClient = async () => {
     const { nom, prenom, email, telephone } = form;
@@ -61,11 +69,17 @@ function ClientsList() {
       return;
     }
 
+    // Ajoute l'UID du commercial connecté
+    const clientData = { ...form };
+    if (currentUser) {
+      clientData.uidCommercial = currentUser.uid;
+    }
+
     if (editingId) {
-      await updateDoc(doc(db, 'clients', editingId), form);
+      await updateDoc(doc(db, 'clients', editingId), clientData);
       toast.success('✅ Client mis à jour.');
     } else {
-      await addDoc(collection(db, 'clients'), form);
+      await addDoc(collection(db, 'clients'), clientData);
       toast.success('✅ Client ajouté.');
     }
 
