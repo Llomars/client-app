@@ -6,16 +6,20 @@ import {
   signOut,
 } from 'firebase/auth';
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+// import { useNavigate } from 'react-router-dom';
 import { auth } from '../firebaseConfig';
 
-export default function Profile() {
+import { useNavigate } from 'react-router-dom';
+import ResetPasswordForm from '../components/ResetPasswordForm';
+
+function Profile() {
   const [user, setUser] = useState(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
+  const [showReset, setShowReset] = useState(false);
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (u) => {
       setUser(u);
@@ -103,7 +107,7 @@ export default function Profile() {
             <div style={{ textAlign: 'right', marginBottom: '8px' }}>
               <button
                 type="button"
-                onClick={() => window.open('https://www.google.com/search?q=mot+de+passe+oublié+Botaik', '_blank')}
+                onClick={() => setShowReset(true)}
                 style={{ background: 'none', border: 'none', color: '#6366f1', fontSize: '14px', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
               >
                 Mot de passe oublié ?
@@ -133,9 +137,11 @@ export default function Profile() {
             </p>
           </>
         )}
+        {showReset && <ResetPasswordForm />}
       </div>
     </div>
   );
+
 }
 
 const inputStyle = {
@@ -158,3 +164,5 @@ const btnStyle = (bg) => ({
   fontSize: '16px',
   cursor: 'pointer',
 });
+
+export default Profile;

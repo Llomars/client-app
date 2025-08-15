@@ -1,13 +1,13 @@
+import { getAuth } from 'firebase/auth';
 import {
-    addDoc,
-    collection,
-    deleteDoc,
-    doc,
-    onSnapshot,
-    updateDoc,
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  updateDoc,
 } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
-import { getAuth } from 'firebase/auth';
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import { db } from '../firebaseConfig';
@@ -17,6 +17,7 @@ import RdvNotesList from './RdvNotesList';
 function ClientsList() {
   const auth = getAuth();
   const [user, setUser] = useState(null);
+  const [userRole, setUserRole] = useState(null);
   const [clients, setClients] = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -48,8 +49,14 @@ function ClientsList() {
 
   // Récupère l'utilisateur connecté
   useEffect(() => {
-    const unsubscribeAuth = auth.onAuthStateChanged((u) => {
+    const unsubscribeAuth = auth.onAuthStateChanged(async (u) => {
       setUser(u);
+      if (u) {
+        const tokenResult = await u.getIdTokenResult();
+        setUserRole(tokenResult.claims.role || null);
+      } else {
+        setUserRole(null);
+      }
     });
     return () => unsubscribeAuth();
   }, [auth]);
@@ -60,15 +67,34 @@ function ClientsList() {
         id: doc.id,
         ...doc.data(),
       }));
-      // Filtrer pour ne garder que les clients du commercial connecté (par email)
+      // Filtrage par rôle
       if (user && user.email) {
-        setClients(data.filter(c => c.emailCommercial === user.email));
+        const userEmailNorm = user.email.trim().toLowerCase();
+        if (userRole === 'manager') {
+          setClients(
+            data.filter(c =>
+              c.emailManager &&
+              c.emailManager.trim().toLowerCase() === userEmailNorm
+            )
+          );
+        } else if (userRole === 'admin') {
+          setClients(data);
+        } else if (userRole === 'commercial') {
+          setClients(
+            data.filter(c =>
+              c.emailCommercial &&
+              c.emailCommercial.trim().toLowerCase() === userEmailNorm
+            )
+          );
+        } else {
+          setClients([]);
+        }
       } else {
         setClients([]);
       }
     });
     return () => unsubscribe();
-  }, [user]);
+  }, [user, userRole]);
 
   const saveClient = async () => {
     const { nom, prenom, email, telephone } = form;
@@ -77,10 +103,18 @@ function ClientsList() {
       return;
     }
 
-    // Ajoute l'email du commercial connecté
+    // Ajoute l'email du commercial ou du manager connecté
     const clientData = { ...form };
     if (user && user.email) {
-      clientData.emailCommercial = user.email;
+      if (userRole === 'manager') {
+        clientData.emailManager = user.email;
+        // On retire emailCommercial si présent
+        if ('emailCommercial' in clientData) delete clientData.emailCommercial;
+      } else if (userRole === 'commercial') {
+        clientData.emailCommercial = user.email;
+        // On retire emailManager si présent
+        if ('emailManager' in clientData) delete clientData.emailManager;
+      }
     }
 
     if (editingId) {
@@ -152,6 +186,22 @@ function ClientsList() {
         boxShadow: '0 4px 20px rgba(0,0,0,0.05)',
       }}
     >
+      {/* DEBUG: Affiche l'email de l'utilisateur connecté et les clients filtrés */}
+      <div style={{ background: '#fef3c7', color: '#92400e', padding: '10px', borderRadius: '8px', marginBottom: '18px', fontSize: '15px' }}>
+        <b>Utilisateur connecté :</b> {user && user.email ? user.email : 'Aucun'}<br />
+        <b>Rôle :</b> {userRole || 'Aucun'}<br />
+        <b>Clients filtrés :</b> {clients.length} <br />
+        <details>
+          <summary>Comparaison email utilisateur / emailCommercial des clients</summary>
+          <ul>
+            {clients.map(c => (
+              <li key={c.id}>
+                {c.emailCommercial} {' === '} {user && user.email ? user.email : 'Aucun'} {' => '} {c.emailCommercial && user && c.emailCommercial.trim().toLowerCase() === user.email.trim().toLowerCase() ? 'OK' : 'NON'}
+              </li>
+            ))}
+          </ul>
+        </details>
+      </div>
       <div
         style={{
           display: 'flex',
@@ -506,39 +556,38 @@ function ClientsList() {
             <h3 style={{ marginTop: 0 }}>
               {editingId ? '✏️ Modifier le Client' : '➕ Ajouter un Client'}
             </h3>
-            {[
-              { name: 'nom', label: 'Nom *' },
-              { name: 'prenom', label: 'Prénom *' },
-              { name: 'email', label: 'Email *' },
-              { name: 'telephone', label: 'Téléphone *' },
-              { name: 'adresse', label: 'Adresse' },
-              { name: 'codePostal', label: 'Code Postal' },
-              { name: 'ville', label: 'Ville' },
-              { name: 'montant', label: 'Montant EDF (€)' },
-              { name: 'prixCentrale', label: 'Prix Centrale (€)' },
-              { name: 'professionMr', label: 'Profession Mr' },
-              { name: 'professionMme', label: 'Profession Mme' },
-              { name: 'ageMr', label: 'Age Mr' },
-              { name: 'ageMme', label: 'Age Mme' },
-              { name: 'commercial', label: 'Commercial' },
-              { name: 'emailCommercial', label: 'Email Commercial' }, // ✅ AJOUT
-            ].map((field) => (
-              <input
-                key={field.name}
-                placeholder={field.label}
-                value={form[field.name]}
-                onChange={(e) =>
-                  setForm({ ...form, [field.name]: e.target.value })
-                }
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  margin: '8px 0',
-                  border: '1px solid #ddd',
-                  borderRadius: '8px',
-                }}
-              />
-            ))}
+      {[ 
+        { name: 'nom', label: 'Nom *' },
+        { name: 'prenom', label: 'Prénom *' },
+        { name: 'email', label: 'Email *' },
+        { name: 'telephone', label: 'Téléphone *' },
+        { name: 'adresse', label: 'Adresse' },
+        { name: 'codePostal', label: 'Code Postal' },
+        { name: 'ville', label: 'Ville' },
+        { name: 'montant', label: 'Montant EDF (€)' },
+        { name: 'prixCentrale', label: 'Prix Centrale (€)' },
+        { name: 'professionMr', label: 'Profession Mr' },
+        { name: 'professionMme', label: 'Profession Mme' },
+        { name: 'ageMr', label: 'Age Mr' },
+        { name: 'ageMme', label: 'Age Mme' },
+        { name: 'commercial', label: 'Commercial' },
+      ].map((field) => (
+        <input
+          key={field.name}
+          placeholder={field.label}
+          value={form[field.name]}
+          onChange={(e) =>
+            setForm({ ...form, [field.name]: e.target.value })
+          }
+          style={{
+            width: '100%',
+            padding: '12px',
+            margin: '8px 0',
+            border: '1px solid #ddd',
+            borderRadius: '8px',
+          }}
+        />
+      ))}
             <select
               value={form.frequence}
               onChange={(e) => setForm({ ...form, frequence: e.target.value })}
