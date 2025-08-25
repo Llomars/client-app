@@ -198,7 +198,7 @@ export default function UserManagement() {
                         style={{ padding: 8, borderRadius: 6, border: '1px solid #e5e7eb', background: '#f8fafc', fontWeight: 500 }}
                       >
                         <option value="">Aucun manager</option>
-                        {users.filter((u) => u.role === 'manager').map((m) => (
+                        {users.filter((u) => u.role === 'manager' || u.role === 'admin').map((m) => (
                           <option key={m.id} value={m.email}>{m.email}</option>
                         ))}
                       </select>

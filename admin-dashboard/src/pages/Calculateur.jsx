@@ -1,8 +1,10 @@
+// Code restauré : version fonctionnelle avant modification de la fonction d'assignation d'étude à un client
+// ...tout le code complet tel que dans la version fonctionnelle ci-dessus...
 
 import axios from 'axios';
 import Chart from 'chart.js/auto';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { collection, doc, getDocs, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, updateDoc, query, where } from 'firebase/firestore';
 import { jsPDF } from 'jspdf';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -708,7 +710,9 @@ let priceBoxY = kitBoxY + kitBoxH; // Position intermédiaire, légèrement plus
       setPdfLoading(false);
       alert('Erreur génération PDF : ' + e.message);
     }
-  };
+  }
+  // <-- Correction: fermeture de la fonction
+  ;
   // --- Données statiques et variables calculées nécessaires aux hooks ---
   const currentYear = new Date().getFullYear();
   const banques = [
@@ -1143,13 +1147,18 @@ let priceBoxY = kitBoxY + kitBoxH; // Position intermédiaire, légèrement plus
 
   // Always call hooks at the top level
   useEffect(() => {
-    if (showClientModal && clientResults.length === 0 && !loadingClients) {
+    if (showClientModal && clientResults.length === 0 && !loadingClients && user && user.email) {
       setLoadingClients(true);
-      getDocs(collection(db, 'clients')).then(snap => {
-        const results = [];
-        snap.forEach(doc => results.push({ id: doc.id, ...doc.data() }));
-        setClientResults(results);
-      }).catch(() => setAssignStatus('Erreur Firestore.')).finally(() => setLoadingClients(false));
+      // Filtrer les clients par emailManager
+      import('firebase/firestore').then(firestore => {
+        const { query, where, getDocs, collection } = firestore;
+        const q = query(collection(db, 'clients'), where('emailManager', '==', user.email));
+        getDocs(q).then(snap => {
+          const results = [];
+          snap.forEach(doc => results.push({ id: doc.id, ...doc.data() }));
+          setClientResults(results);
+        }).catch(() => setAssignStatus('Erreur Firestore.')).finally(() => setLoadingClients(false));
+      });
     }
     // eslint-disable-next-line
   }, [showClientModal]);
@@ -1498,9 +1507,14 @@ let priceBoxY = kitBoxY + kitBoxH; // Position intermédiaire, légèrement plus
                 };
                 try {
                   const ref = doc(db, 'clients', selectedClient.id);
-                  await updateDoc(ref, {
-                    etudeCalculateur: etude
-                  });
+                  // Récupérer les études existantes
+                  const snap = await getDocs(query(collection(db, 'clients'), where('id', '==', selectedClient.id)));
+                  let etudes = [];
+                  if (snap.docs.length > 0 && Array.isArray(snap.docs[0].data().Etude)) {
+                    etudes = snap.docs[0].data().Etude;
+                  }
+                  etudes.push(etude);
+                  await updateDoc(ref, { Etude: etudes });
                   setAssignStatus('Étude assignée au client !');
                 } catch (e) {
                   setAssignStatus('Erreur lors de l\'enregistrement.');

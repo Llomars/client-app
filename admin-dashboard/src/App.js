@@ -4,6 +4,7 @@ import Header from './components/Header';
 import Home from './pages/Home';
 import Clients from './pages/Clients';
 import CommercialDashboard from './pages/CommercialDashboard';
+import MesClients from './pages/MesClients';
 import Parrainages from './pages/Parrainages';
 import Performance from './pages/Performance';
 import Profile from './pages/Profile';
@@ -27,6 +28,7 @@ export default function App() {
         <Route path="/" element={<Home />} />
         <Route path="/clients" element={<Clients />} />
         <Route path="/dashboard" element={<CommercialDashboard />} />
+        <Route path="/mes-clients" element={<MesClients />} />
         <Route path="/parrainages" element={<Parrainages />} />
         <Route path="/performance" element={<Performance />} />
         <Route path="/profile" element={<Profile />} />

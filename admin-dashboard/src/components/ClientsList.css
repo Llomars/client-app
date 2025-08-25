@@ -1,0 +1,7 @@
+.btn { padding: 8px 14px; border: none; border-radius: 6px; cursor: pointer; font-weight: 500; transition: 0.2s; }
+.btn:hover { opacity: 0.9; }
+.btn.green { background: #22c55e; color: white; }
+.btn.red { background: #ef4444; color: white; }
+.btn.grey { background: #64748b; color: white; }
+.btn.blue { background: #3b82f6; color: white; }
+.select { padding: 8px 10px; border-radius: 6px; border: 1px solid #ddd; }

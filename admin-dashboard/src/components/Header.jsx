@@ -67,6 +67,23 @@ export default function Header() {
           >
             🏠 Mon Dashboard
           </Link>
+          <Link
+            to="/mes-clients"
+            style={{
+              background: '#f59e42',
+              padding: '8px 16px',
+              borderRadius: '8px',
+              textDecoration: 'none',
+              color: '#fff',
+              fontWeight: '500',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+          >
+            <span role="img" aria-label="clients" style={{ fontSize: 20 }}>👥</span>
+            Mes clients
+          </Link>
 
           {/* Liens admin */}
           {role === 'admin' && (
