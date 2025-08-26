@@ -531,59 +531,29 @@ function EquipeStatsSection() {
     });
   }, []);
 
-  // Calcule les stats d'équipe pour un manager (mois/année)
+  // Calcule les stats d'équipe pour un manager (mois/année) en lisant statsVendeurs
+  const [statsVendeurs, setStatsVendeurs] = React.useState([]);
+  React.useEffect(() => {
+    getDocs(collection(db, 'statsVendeurs')).then(snap => {
+      setStatsVendeurs(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    });
+  }, [selectedMonth, selectedYear]);
+
   const getEquipeStats = (managerEmail) => {
+    const moisActuel = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+    // Stats manager
+    const statsManager = statsVendeurs.find(s => s.email === managerEmail && s.mois === moisActuel) || {};
+    // Stats commerciaux
     const teamCommerciaux = commerciaux.filter(com => com.managerEmail === managerEmail);
-    // Pour chaque commercial, stats du mois sélectionné
     const statsCommerciaux = teamCommerciaux.map(com => {
-      const commClients = clients.filter(c => c.emailCommercial === com.email || c.emailCom === com.email);
-      // CA du mois
-      const caMois = commClients.reduce((sum, c) => {
-        const d = c.dateVente ? new Date(c.dateVente) : null;
-        if (d && d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear && (c.statut === 'Vendu' || c.statut === 'Signé')) {
-          return sum + (parseFloat(c.prixCentrale) || 0);
-        }
-        return sum;
-      }, 0);
-      // Nombre de ventes du mois
-      const ventesMois = commClients.filter(c => {
-        const d = c.dateVente ? new Date(c.dateVente) : null;
-        return d && d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear && (c.statut === 'Vendu' || c.statut === 'Signé');
-      }).length;
-      // Top 3 professions sur l'année
-      const profCount = {};
-      commClients.forEach(c => {
-        const d = c.dateVente ? new Date(c.dateVente) : null;
-        if (d && d.getFullYear() === selectedYear && (c.statut === 'Vendu' || c.statut === 'Signé')) {
-          [c.professionMr, c.professionMme].filter(Boolean).forEach(p => {
-            profCount[p] = (profCount[p] || 0) + 1;
-          });
-        }
-      });
-      const topProfs = Object.entries(profCount)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 3);
-      // Stats par jour pour chaque commercial
-      const rdvByDay = {};
-      commClients.forEach(c => {
-        const d = c.dateVente ? new Date(c.dateVente) : null;
-        if (d) {
-          const dayStr = d.toISOString().slice(0, 10);
-          if (!rdvByDay[dayStr]) rdvByDay[dayStr] = { pris: 0, faits: 0, vendus: 0 };
-          rdvByDay[dayStr].pris++;
-          if (c.statut === 'Vendu' || c.statut === 'Signé') rdvByDay[dayStr].vendus++;
-          if (c.statut === 'Fait' || c.statut === 'Vendu' || c.statut === 'Signé') rdvByDay[dayStr].faits++;
-        }
-      });
+      const statsCom = statsVendeurs.find(s => s.email === com.email && s.mois === moisActuel) || {};
       return {
         ...com,
-        caMois,
-        ventesMois,
-        topProfs,
-        rdvByDay
+        nbRdvPris: statsCom.nbRdvPris || 0,
+        nbRdvFait: statsCom.nbRdvFait || 0,
       };
     });
-    // Stats globales équipe
+    // CA équipe (toujours calculé à partir des clients)
     const equipeClients = clients.filter(c => c.emailManager === managerEmail);
     const ca = equipeClients.reduce((sum, c) => {
       const d = c.dateVente ? new Date(c.dateVente) : null;
@@ -592,14 +562,10 @@ function EquipeStatsSection() {
       }
       return sum;
     }, 0);
-    const rdvPris = equipeClients.filter(c => {
-      const d = c.dateVente ? new Date(c.dateVente) : null;
-      return d && d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
-    }).length;
-    const rdvFaits = equipeClients.filter(c => {
-      const d = c.dateVente ? new Date(c.dateVente) : null;
-      return d && d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear && (c.statut === 'Vendu' || c.statut === 'Signé');
-    }).length;
+    // Utilise les stats Firestore pour RDV pris/fait
+    const rdvPris = statsManager.nbRdvPris || 0;
+    const rdvFaits = statsManager.nbRdvFait || 0;
+    // Ventes (toujours calculé à partir des clients)
     const ventes = equipeClients.filter(c => {
       const d = c.dateVente ? new Date(c.dateVente) : null;
       return d && d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear && c.statut === 'Vendu';
@@ -623,20 +589,29 @@ function EquipeStatsSection() {
       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
         {managers.map(email => {
           const stats = getEquipeStats(email);
+          // Détail manager/admin
+          const managerStats = statsVendeurs.find(s => s.email === email && s.mois === `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`) || {};
           return (
             <div key={email} style={{ background: '#f1f5f9', borderRadius: 12, boxShadow: '0 2px 8px #2563eb11', padding: 18, minWidth: 320, borderLeft: '6px solid #6366f1', marginBottom: 12 }}>
               <div style={{ fontWeight: 700, fontSize: 16, color: '#6366f1', marginBottom: 6 }}>Manager : {email}</div>
-              <div style={{ color: '#334155', fontWeight: 600, fontSize: 15, marginBottom: 4 }}>Commerciaux attribués :</div>
+              <div style={{ color: '#334155', fontWeight: 600, fontSize: 15, marginBottom: 4 }}>Détail équipe :</div>
+              <div style={{ marginBottom: 10, padding: '8px 12px', background: '#e0e7ff', borderRadius: 8 }}>
+                <div style={{ fontWeight: 600, color: '#334155', fontSize: 15, marginBottom: 2 }}>Manager/Admin : {email}</div>
+                <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>RDV pris : <b>{managerStats.nbRdvPris || 0}</b></div>
+                <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>RDV faits : <b>{managerStats.nbRdvFait || 0}</b></div>
+                <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>Vendus : <b>{stats.equipe.filter(c => c.statut === 'Vendu' && c.emailManager === email).length}</b></div>
+              </div>
               {stats.commerciaux.length === 0 ? (
                 <div style={{ fontSize: 14, color: '#64748b' }}>Aucun commercial attribué</div>
               ) : stats.commerciaux.map(com => {
-                const dayStats = com.rdvByDay[selectedDay] || { pris: 0, faits: 0, vendus: 0 };
+                // Détail du commercial
+                const ventesCom = stats.equipe.filter(c => c.statut === 'Vendu' && c.emailCommercial === com.email).length;
                 return (
                   <div key={com.email} style={{ marginBottom: 10, padding: '8px 12px', background: '#fff', borderRadius: 8 }}>
                     <div style={{ fontWeight: 600, color: '#334155', fontSize: 15, marginBottom: 2 }}>{com.nom || com.email}</div>
-                    <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>RDV pris : <b>{dayStats.pris}</b></div>
-                    <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>RDV faits : <b>{dayStats.faits}</b></div>
-                    <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>RDV vendus : <b>{dayStats.vendus}</b></div>
+                    <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>RDV pris : <b>{com.nbRdvPris || 0}</b></div>
+                    <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>RDV faits : <b>{com.nbRdvFait || 0}</b></div>
+                    <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>Vendus : <b>{ventesCom}</b></div>
                   </div>
                 );
               })}
@@ -708,18 +683,21 @@ function EquipeStatsSection() {
                 ) : stats.commerciaux.map(com => (
                   <div key={com.email} style={{ marginBottom: 12, padding: '10px 14px', background: '#f1f5f9', borderRadius: 8 }}>
                     <div style={{ fontWeight: 600, color: '#334155', fontSize: 15, marginBottom: 2 }}>{com.nom || com.email}</div>
-                    <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>CA du mois : <b>{com.caMois.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</b></div>
-                    <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>Ventes du mois : <b>{com.ventesMois}</b></div>
-                    <div style={{ fontSize: 14, color: '#2563eb', marginBottom: 2 }}>Top 3 professions vendues :</div>
-                    <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-                      {com.topProfs.length === 0 ? (
-                        <li style={{ fontSize: 13, color: '#64748b' }}>Aucune vente enregistrée</li>
-                      ) : com.topProfs.map(([prof, count]) => (
-                        <li key={prof} style={{ marginBottom: 2, fontSize: 13 }}>
-                          <b>{prof}</b> : {count} ventes
-                        </li>
-                      ))}
-                    </ul>
+                    <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>CA du mois : <b>{typeof com.caMois === 'number' ? com.caMois.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' }) : '0 €'}</b></div>
+                    <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>Ventes du mois : <b>{com.ventesMois || 0}</b></div>
+                    {/* Top professions : si dispo, sinon rien */}
+                    {Array.isArray(com.topProfs) && com.topProfs.length > 0 && (
+                      <div style={{ fontSize: 14, color: '#2563eb', marginBottom: 2 }}>Top 3 professions vendues :</div>
+                    )}
+                    {Array.isArray(com.topProfs) && com.topProfs.length > 0 && (
+                      <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                        {com.topProfs.map(([prof, count]) => (
+                          <li key={prof} style={{ marginBottom: 2, fontSize: 13 }}>
+                            <b>{prof}</b> : {count} ventes
+                          </li>
+                        ))}
+                      </ul>
+                    )}
                   </div>
                 ))}
               </div>

@@ -944,16 +944,10 @@ let priceBoxY = kitBoxY + kitBoxH; // Position intermédiaire, légèrement plus
   }, []);
   // --- Access control: only allow certain roles ---
   useEffect(() => {
-    if (authChecked) {
-      const allowedRoles = ['admin', 'manager', 'commercial', 'phoneur'];
-      // Ne redirige que si le rôle est bien défini (évite écran blanc)
-      if (!user) {
-        navigate('/');
-      } else if (role !== null && !allowedRoles.includes(role)) {
-        navigate('/');
-      }
+    if (authChecked && !user) {
+      navigate('/');
     }
-  }, [authChecked, user, role, navigate]);
+  }, [authChecked, user, navigate]);
 
   // Met à jour prix centrale, prix net, montant à financer, prime et gain revente (surplus, bon tarif) quand kit/remise change
   useEffect(() => {

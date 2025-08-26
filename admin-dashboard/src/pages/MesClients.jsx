@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where, setDoc, increment } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import { auth, db } from '../firebaseConfig';
 
@@ -27,7 +27,8 @@ export default function MesClients() {
     setFormRapide(prev => ({ ...prev, [name]: value }));
   };
   const [commerciaux, setCommerciaux] = useState([]);
-  const [activeTab, setActiveTab] = useState(null);
+  // Onglet actif : email du manager ou d'un commercial
+  const [activeTab, setActiveTab] = useState('me');
   const [clients, setClients] = useState([]);
   const [nouveauClient, setNouveauClient] = useState({
     nom: '',
@@ -127,41 +128,17 @@ export default function MesClients() {
       const commerciauxSnap = await getDocs(query(collection(db, 'users'), where('managerEmail', '==', user.email)));
       const commerciauxList = commerciauxSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setCommerciaux(commerciauxList);
-      // Récupère tous les clients attribués au manager
+      // Récupère tous les clients du manager et de ses commerciaux
       const clientsSnap = await getDocs(query(collection(db, 'clients'), where('emailManager', '==', user.email)));
       let clientList = clientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Ajoute un faux client pour chaque commercial attribué au manager (démo locale)
-      if (commerciauxList.length > 0) {
-        commerciauxList.forEach((comm, idx) => {
-          // Vérifie si le commercial a déjà un client
-          const hasClient = clientList.some(c => c.emailManager === comm.email);
-          if (!hasClient) {
-            clientList.push({
-              id: 'demo-' + comm.email,
-              nom: 'Démo',
-              prenom: 'Client',
-              email: 'demo.client+' + idx + '@test.com',
-              telephone: '060000000' + idx,
-              adresse: '1 rue de la Démo',
-              ville: 'DemoVille',
-              montantFactureEDF: 123,
-              ageMR: 40,
-              ageMME: 38,
-              professionMR: 'Développeur',
-              professionMME: 'Designer',
-              emailManager: comm.email,
-              statut: 'En cours',
-              Etude: [],
-              docs: {},
-              debrief: { bien: '', moinsBien: '', ressenti: '', venteEffectuee: '' }
-            });
-          }
-        });
+      // Récupère aussi les clients de chaque commercial géré
+      for (const comm of commerciauxList) {
+        const commClientsSnap = await getDocs(query(collection(db, 'clients'), where('emailCommercial', '==', comm.email)));
+        const commClients = commClientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data(), _commercial: comm.email }));
+        clientList = clientList.concat(commClients);
       }
-      // Trie pour afficher le dernier ajouté en haut
       setClients([...clientList].reverse());
-      // Onglet actif par défaut = premier commercial
-      if (commerciauxList.length > 0 && !activeTab) setActiveTab(commerciauxList[0].email);
+      // Onglet actif par défaut = 'me' (manager/admin)
       // Récupère tous les managers et admins pour la sélection du manager
       const managersSnap = await getDocs(query(collection(db, 'users'), where('role', 'in', ['manager', 'admin'])));
       let managersList = managersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -211,7 +188,8 @@ export default function MesClients() {
     if (formRapide.consoVoiture) elementsConso.push('Voiture électrique');
     if (formRapide.consoAutres) elementsConso.push('Autres');
     // Ajout Firestore
-    await addDoc(collection(db, 'clients'), {
+    const managerEmail = formRapide.emailManager || user.email;
+    const clientRef = await addDoc(collection(db, 'clients'), {
       nom: formRapide.nom,
       prenom: formRapide.prenom,
       adresse: formRapide.adresseClient,
@@ -223,15 +201,43 @@ export default function MesClients() {
       ageMR: formRapide.ageMR,
       professionMME: formRapide.professionMME,
       ageMME: formRapide.ageMME,
-      emailManager: formRapide.emailManager || user.email,
+      emailManager: managerEmail,
       emailCommercial: user.email, // accès commercial
       email: '', // champ vide car non demandé
       ville: '', // champ vide car non demandé
       statut: 'En cours',
       Etude: [],
       docs: {},
-      debrief: { bien: '', moinsBien: '', ressenti: '', venteEffectuee: '' }
+      debrief: { bien: '', moinsBien: '', ressenti: '', venteEffectuee: '' },
+      rdvFait: false,
+      dateRdvPris: new Date().toISOString().slice(0, 10), // Date de prise de RDV pour stats équipe
     });
+    // Mise à jour stats équipe pour RDV pris
+    const moisActuel = new Date().toISOString().slice(0, 7);
+    // Stat du commercial (celui qui ajoute)
+    const statsId = `${user.email}_${moisActuel}`;
+    const statsRef = doc(db, 'statsVendeurs', statsId);
+    try {
+      await updateDoc(statsRef, { nbRdvPris: increment(1) });
+    } catch (e) {
+      await setDoc(statsRef, { email: user.email, mois: moisActuel, nbRdvPris: 1 });
+    }
+    // Stat du manager (toujours incrémentée)
+    const statsManagerId = `${managerEmail}_${moisActuel}`;
+    const statsManagerRef = doc(db, 'statsVendeurs', statsManagerId);
+    try {
+      await updateDoc(statsManagerRef, { nbRdvPris: increment(1) });
+    } catch (e) {
+      await setDoc(statsManagerRef, { email: managerEmail, mois: moisActuel, nbRdvPris: 1 });
+    }
+    // Stat générale
+    const statsGeneralId = `general_${moisActuel}`;
+    const statsGeneralRef = doc(db, 'statsVendeurs', statsGeneralId);
+    try {
+      await updateDoc(statsGeneralRef, { nbRdvPris: increment(1) });
+    } catch (e) {
+      await setDoc(statsGeneralRef, { mois: moisActuel, nbRdvPris: 1 });
+    }
     // Reset form
     setFormRapide({
       factureEdf: '',
@@ -261,11 +267,33 @@ export default function MesClients() {
   const handleAjoutClient = async (e) => {
     e.preventDefault();
     if (nouveauClient.nom && nouveauClient.prenom && nouveauClient.adresse && nouveauClient.ville && nouveauClient.email && nouveauClient.telephone && user) {
-      await addDoc(collection(db, 'clients'), {
+      const clientRef = await addDoc(collection(db, 'clients'), {
         ...nouveauClient,
         emailManager: user.email,
         emailCommercial: user.email, // accès commercial
+        rdvFait: false,
+        dateRdvPris: new Date().toISOString().slice(0, 10), // Date de prise de RDV pour stats équipe
       });
+      // Mise à jour stats équipe pour RDV pris
+      const moisActuel = new Date().toISOString().slice(0, 7);
+      // Stat du commercial (celui qui ajoute)
+      const statsId = `${user.email}_${moisActuel}`;
+      const statsRef = doc(db, 'statsVendeurs', statsId);
+      try {
+        await updateDoc(statsRef, { nbRdvPris: increment(1) });
+      } catch (e) {
+        await setDoc(statsRef, { email: user.email, mois: moisActuel, nbRdvPris: 1 });
+      }
+      // Stat du manager (si différent du commercial)
+      const managerEmail = user.email; // dans ce formulaire, manager = user
+      // Stat générale
+      const statsGeneralId = `general_${moisActuel}`;
+      const statsGeneralRef = doc(db, 'statsVendeurs', statsGeneralId);
+      try {
+        await updateDoc(statsGeneralRef, { nbRdvPris: increment(1) });
+      } catch (e) {
+        await setDoc(statsGeneralRef, { mois: moisActuel, nbRdvPris: 1 });
+      }
       setNouveauClient({
         nom: '',
         prenom: '',
@@ -350,17 +378,7 @@ export default function MesClients() {
     }
   };
 
-  // Affiche la page seulement si admin ou manager
-  if (userRole === 'commercial') {
-    return (
-      <div style={{ padding: 40 }}>
-        <h2>Mes clients</h2>
-        <div style={{ color: '#ef4444', fontWeight: 600, marginTop: 24 }}>
-          Accès réservé aux managers et administrateurs.
-        </div>
-      </div>
-    );
-  }
+  // Affiche la page pour tous les utilisateurs connectés
   return (
     <div style={{ padding: 40 }}>
       <h2>Mes clients</h2>
@@ -369,9 +387,44 @@ export default function MesClients() {
           <b>Utilisateur connecté :</b> {user.email}
         </div>
       )}
-      {/* DEBUG: Affichage commerciaux récupérés */}
-      <div style={{ marginBottom: 12, color: '#ef4444', fontSize: 14 }}>
-        <b>Commerciaux récupérés :</b> {commerciaux.map(c => `${(c.nom || '') + ' ' + (c.prenom || '')}`.trim() ? `${c.nom || ''} ${c.prenom || ''} (${c.email})` : c.email).join(', ')}
+      {/* Onglets pour switcher entre manager/admin et commerciaux */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+        <button
+          onClick={() => setActiveTab('me')}
+          style={{
+            padding: '8px 18px',
+            background: activeTab === 'me' ? '#2563eb' : '#e5e7eb',
+            color: activeTab === 'me' ? '#fff' : '#334155',
+            border: 'none',
+            borderRadius: 6,
+            fontWeight: 600,
+            fontSize: 16,
+            cursor: 'pointer',
+          }}
+        >
+          Moi ({user?.email})
+        </button>
+        {commerciaux.map((c) => {
+          const hasName = (c.nom && c.nom.trim()) || (c.prenom && c.prenom.trim());
+          return (
+            <button
+              key={c.email}
+              onClick={() => setActiveTab(c.email)}
+              style={{
+                padding: '8px 18px',
+                background: activeTab === c.email ? '#2563eb' : '#e5e7eb',
+                color: activeTab === c.email ? '#fff' : '#334155',
+                border: 'none',
+                borderRadius: 6,
+                fontWeight: 600,
+                fontSize: 16,
+                cursor: 'pointer',
+              }}
+            >
+              {hasName ? `${c.nom || ''} ${c.prenom || ''}`.trim() + ` (${c.email})` : c.email}
+            </button>
+          );
+        })}
       </div>
       <form onSubmit={handleAjoutClient} style={{ marginBottom: 24, display: 'flex', flexWrap: 'wrap', gap: 12 }}>
         <input type="text" name="nom" placeholder="Nom" value={nouveauClient.nom} onChange={handleChangeClient} style={{ padding: 8, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 16, flex: '1 1 180px' }} required />
@@ -523,16 +576,31 @@ export default function MesClients() {
     </form>
       ) : (
         <ul style={{ listStyle: 'none', padding: 0 }}>
-          {clients.length === 0 && (
+          {/* Filtrage selon l'onglet actif */}
+          {clients.filter(client => {
+            if (activeTab === 'me') {
+              // Manager/admin : clients dont emailManager === user.email && emailCommercial === user.email
+              return client.emailManager === user.email && client.emailCommercial === user.email;
+            } else {
+              // Commercial sélectionné : clients dont emailCommercial === activeTab
+              return client.emailCommercial === activeTab;
+            }
+          }).length === 0 && (
             <li style={{ color: '#ef4444', fontWeight: 600 }}>
               Aucun client attribué.<br />
               <span style={{ fontWeight: 400, color: '#64748b' }}>
-                Vérifie que tes clients dans Firestore ont bien le champ <b>emailManager</b> égal à <b>{user ? user.email : ''}</b>.<br />
+                Vérifie que tes clients dans Firestore ont bien le champ <b>emailManager</b> ou <b>emailCommercial</b>.<br />
                 (Sinon, ajoute un client avec le formulaire ci-dessus pour tester)
               </span>
             </li>
           )}
-          {clients.map((client) => (
+          {clients.filter(client => {
+            if (activeTab === 'me') {
+              return client.emailManager === user.email && client.emailCommercial === user.email;
+            } else {
+              return client.emailCommercial === activeTab;
+            }
+          }).map((client) => (
             <li key={client.id} style={{ background: '#f1f5f9', borderRadius: 8, padding: 14, marginBottom: 10 }}>
               {editId === client.id ? (
                 <form onSubmit={handleSaveEditClient} style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
@@ -578,6 +646,51 @@ export default function MesClients() {
               ) : (
                 <>
                   <div style={{ fontWeight: 600, fontSize: 17 }}>{client.nom} {client.prenom}</div>
+                  <div style={{ margin: '8px 0' }}>
+                    <label style={{ fontWeight: 500, fontSize: 15 }}>
+                      RDV fait :
+                      <input
+                        type="checkbox"
+                        checked={!!client.rdvFait}
+                        onChange={async (e) => {
+                          const checked = e.target.checked;
+                          await updateDoc(doc(db, 'clients', client.id), { rdvFait: checked });
+                          setClients(clients.map(c => c.id === client.id ? { ...c, rdvFait: checked } : c));
+                          // Si on coche (RDV fait passe de false à true), on incrémente nbRdvFait
+                          if (checked && !client.rdvFait) {
+                            const moisActuel = new Date().toISOString().slice(0, 7);
+                            // Stat du commercial
+                            const commercialEmail = client.emailCommercial || user?.email;
+                            const statsId = `${commercialEmail}_${moisActuel}`;
+                            const statsRef = doc(db, 'statsVendeurs', statsId);
+                            try {
+                              await updateDoc(statsRef, { nbRdvFait: increment(1) });
+                            } catch (e) {
+                              await setDoc(statsRef, { email: commercialEmail, mois: moisActuel, nbRdvFait: 1 });
+                            }
+                            // Stat du manager
+                            const managerEmail = client.emailManager || user?.email;
+                            const statsManagerId = `${managerEmail}_${moisActuel}`;
+                            const statsManagerRef = doc(db, 'statsVendeurs', statsManagerId);
+                            try {
+                              await updateDoc(statsManagerRef, { nbRdvFait: increment(1) });
+                            } catch (e) {
+                              await setDoc(statsManagerRef, { email: managerEmail, mois: moisActuel, nbRdvFait: 1 });
+                            }
+                            // Stat générale
+                            const statsGeneralId = `general_${moisActuel}`;
+                            const statsGeneralRef = doc(db, 'statsVendeurs', statsGeneralId);
+                            try {
+                              await updateDoc(statsGeneralRef, { nbRdvFait: increment(1) });
+                            } catch (e) {
+                              await setDoc(statsGeneralRef, { mois: moisActuel, nbRdvFait: 1 });
+                            }
+                          }
+                        }}
+                        style={{ marginLeft: 8 }}
+                      />
+                    </label>
+                  </div>
                   <div style={{ color: '#64748b', marginBottom: 4 }}>{client.email} | {client.telephone}</div>
                   <div style={{ fontSize: 15 }}>{client.adresse}, {client.ville}</div>
                   <div style={{ fontSize: 15 }}>Facture EDF: {client.montantFactureEDF} €</div>
