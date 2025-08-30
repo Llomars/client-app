@@ -523,11 +523,17 @@ function EquipeStatsSection() {
     getDocs(collection(db, 'clients')).then(snap => {
       const allClients = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setClients(allClients);
-      const managerEmails = [...new Set(allClients.map(c => c.emailManager).filter(Boolean))];
-      setManagers(managerEmails);
-    });
-    getDocs(collection(db, 'users')).then(snap => {
-      setCommerciaux(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      // On ne retient comme managers que les emails des users ayant le rôle 'manager' ou 'admin'
+      getDocs(collection(db, 'users')).then(userSnap => {
+        const users = userSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setCommerciaux(users);
+        // Filtre les doublons d'emails manager/admin
+        const seenEmails = new Set();
+        const managerEmails = users
+          .filter(u => (u.role === 'manager' || u.role === 'admin') && u.email && !seenEmails.has(u.email) && seenEmails.add(u.email))
+          .map(u => u.email);
+        setManagers(managerEmails);
+      });
     });
   }, []);
 
@@ -685,6 +691,8 @@ function EquipeStatsSection() {
                     <div style={{ fontWeight: 600, color: '#334155', fontSize: 15, marginBottom: 2 }}>{com.nom || com.email}</div>
                     <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>CA du mois : <b>{typeof com.caMois === 'number' ? com.caMois.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' }) : '0 €'}</b></div>
                     <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>Ventes du mois : <b>{com.ventesMois || 0}</b></div>
+                    <div style={{ fontSize: 14, color: '#2563eb', marginBottom: 2 }}>RDV pris (mois) : <b>{com.nbRdvPris || 0}</b></div>
+                    <div style={{ fontSize: 14, color: '#2563eb', marginBottom: 2 }}>RDV faits (mois) : <b>{com.nbRdvFait || 0}</b></div>
                     {/* Top professions : si dispo, sinon rien */}
                     {Array.isArray(com.topProfs) && com.topProfs.length > 0 && (
                       <div style={{ fontSize: 14, color: '#2563eb', marginBottom: 2 }}>Top 3 professions vendues :</div>
