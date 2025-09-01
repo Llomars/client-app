@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
 import { addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
+import { useEffect, useState } from 'react';
 import { auth, db } from '../firebaseConfig';
 
 const storage = getStorage();
@@ -79,6 +79,7 @@ export default function MesClients() {
   const [editClient, setEditClient] = useState(null);
   const [showUploadId, setShowUploadId] = useState(null);
   const [showDebriefId, setShowDebriefId] = useState(null);
+  const [showFicheClientId, setShowFicheClientId] = useState(null);
   const [debrief, setDebrief] = useState({ bien: '', moinsBien: '', ressenti: '', venteEffectuee: '' });
   const docTypes = [
     'PI',
@@ -171,6 +172,12 @@ export default function MesClients() {
         ];
       }
       setManagers(managersList);
+      // Initialise l'état projet local à partir de Firestore
+      const etatProjetInit = {};
+      clientList.forEach(c => {
+        if (c.etatProjet) etatProjetInit[c.id] = c.etatProjet;
+      });
+      setEtatProjet(etatProjetInit);
       // setLoading(false);
     };
     fetchClientsAndCommerciaux();
@@ -315,22 +322,7 @@ export default function MesClients() {
 
   // --- AJOUT ÉTUDE PERSO ---
   const [showEtudePersoId, setShowEtudePersoId] = useState(null);
-  const [etudePerso, setEtudePerso] = useState({
-    four: false,
-    tele: false,
-    plaque: false,
-    frigo: 1,
-    congelateur: false,
-    clims: 0,
-    piscine: false,
-    pompeChaleur: false,
-    jacuzzi: false,
-    voitureElec: false,
-    caveVin: false,
-    consolesPc: false,
-    brasseurAir: false,
-    autres: '',
-  });
+  const [etudePerso, setEtudePerso] = useState(null);
   const etudePersoElements = [
     { key: 'four', label: 'Four', type: 'bool' },
     { key: 'tele', label: 'Télé', type: 'bool' },
@@ -376,6 +368,51 @@ export default function MesClients() {
   const handleSaveEtudePerso = async (clientId) => {
     await updateDoc(doc(db, 'clients', clientId), { etudePerso });
     setShowEtudePersoId(null);
+    if (user) {
+      const q = query(collection(db, 'clients'), where('emailManager', '==', user.email));
+      const snap = await getDocs(q);
+      const refreshed = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setClients([...refreshed].reverse());
+    }
+  };
+
+  // --- GESTION ÉTAT PROJET ---
+  const [showEtatProjetId, setShowEtatProjetId] = useState(null);
+  const [etatProjet, setEtatProjet] = useState({});
+
+  // Handler pour ouvrir la modal Etat projet
+  const handleOpenEtatProjet = (clientId) => {
+    setShowEtatProjetId(clientId);
+    setEtatProjet(prev => ({
+      ...prev,
+      [clientId]: prev[clientId] || {
+        rdvFait: false,
+        attente: false,
+        vendu: false,
+        declarationEnCours: false,
+        declarationValidee: false,
+        installe: false
+      }
+    }));
+  };
+
+  // Handler pour changer une case à cocher
+  const handleChangeEtatProjet = (field, value) => {
+    setEtatProjet(prev => ({
+      ...prev,
+      [showEtatProjetId]: {
+        ...prev[showEtatProjetId],
+        [field]: value
+      }
+    }));
+  };
+
+  // Handler pour sauvegarder l'état projet (à adapter si tu veux persister dans Firestore)
+  const handleSaveEtatProjet = async (clientId) => {
+    // Sauvegarde dans Firestore
+    await updateDoc(doc(db, 'clients', clientId), { etatProjet: etatProjet[clientId] });
+    setShowEtatProjetId(null);
+    // Optionnel : refresh clients pour afficher l'état à jour
     if (user) {
       const q = query(collection(db, 'clients'), where('emailManager', '==', user.email));
       const snap = await getDocs(q);
@@ -613,307 +650,462 @@ export default function MesClients() {
             </span>
           </li>
         )}
-        {clients.filter(c => activeTab ? c.emailManager === activeTab : true).map((client) => (
-          <li key={client.id} style={{ background: '#f1f5f9', borderRadius: 8, padding: 14, marginBottom: 10 }}>
-            {editId === client.id ? (
-              <form onSubmit={handleSaveEditClient} style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
-                <input type="text" name="nom" placeholder="Nom" value={editClient.nom} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} required />
-                <input type="text" name="prenom" placeholder="Prénom" value={editClient.prenom} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} required />
-                <input type="text" name="adresse" placeholder="Adresse" value={editClient.adresse} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} required />
-                <input type="text" name="ville" placeholder="Ville" value={editClient.ville} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} required />
-                <input type="email" name="email" placeholder="Adresse mail" value={editClient.email} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} required />
-                <input type="tel" name="telephone" placeholder="Numéro de téléphone" value={editClient.telephone} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} required />
-                <input type="number" name="montantFactureEDF" placeholder="Montant facture EDF (€)" value={editClient.montantFactureEDF} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} />
-                <input type="number" name="ageMR" placeholder="Âge de MR" value={editClient.ageMR} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} />
-                <input type="number" name="ageMME" placeholder="Âge de Mme" value={editClient.ageMME} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} />
-                {commerciaux.length > 0 && (
-                  <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-                    {commerciaux.map((c) => {
-                      const hasName = (c.nom && c.nom.trim()) || (c.prenom && c.prenom.trim());
-                      return (
-                        <button
-                          key={c.email}
-                          onClick={() => setActiveTab(c.email)}
-                          style={{
-                            padding: '8px 18px',
-                            background: activeTab === c.email ? '#2563eb' : '#e5e7eb',
-                            color: activeTab === c.email ? '#fff' : '#334155',
-                            border: 'none',
-                            borderRadius: 6,
-                            fontWeight: 600,
-                            fontSize: 16,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          {hasName ? `${c.nom || ''} ${c.prenom || ''}`.trim() + ` (${c.email})` : c.email}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-                <input type="text" name="professionMR" placeholder="Profession de MR" value={editClient.professionMR} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} />
-                <input type="text" name="professionMME" placeholder="Profession de Mme" value={editClient.professionMME} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} />
-                <button type="submit" style={{ padding: '6px 14px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Enregistrer</button>
-                <button type="button" onClick={() => { setEditId(null); setEditClient(null); }} style={{ padding: '6px 14px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Annuler</button>
-              </form>
-            ) : (
-              <>
-                <div style={{ fontWeight: 600, fontSize: 17 }}>{client.nom} {client.prenom}</div>
-                <div style={{ color: '#64748b', marginBottom: 4 }}>{client.email} | {client.telephone}</div>
-                <div style={{ fontSize: 15 }}>{client.adresse}, {client.ville}</div>
-                <div style={{ fontSize: 15 }}>Facture EDF: {client.montantFactureEDF} €</div>
-                <div style={{ fontSize: 15 }}>Âge MR: {client.ageMR} | Âge Mme: {client.ageMME}</div>
-                <div style={{ fontSize: 15 }}>Profession MR: {client.professionMR} | Profession Mme: {client.professionMME}</div>
-                {/* Affichage des études associées au client */}
-                {Array.isArray(client.Etude) && client.Etude.length > 0 && (
-                  <div style={{ background: '#e0f2fe', borderRadius: 8, padding: 12, marginTop: 10 }}>
-                    <h4 style={{ marginBottom: 8 }}>Études assignées</h4>
-                    {client.Etude.map((etude, idx) => (
-                      <div key={idx} style={{ marginBottom: 12, padding: 10, background: '#fff', borderRadius: 6, boxShadow: '0 2px 8px #2563eb22' }}>
-                        <div style={{ fontWeight: 600, color: '#2563eb', marginBottom: 4 }}>Étude du {new Date(etude.date).toLocaleDateString('fr-FR')}</div>
-                        <div>Production estimée à l'année : <b>{etude.prodMoyenneKwh} kWh</b></div>
-                        <div>KWh consommés à l'année : <b>{etude.conso} kWh</b></div>
-                        <div>Prime EDF : <b>{etude.prime} €</b></div>
-                        <div>Année de rentabilité : <b>{etude.anneeRentable || etude.nbAnneesRentable || '-'}</b></div>
-                        {/* Tableau de rentabilité si dispo */}
-                        {etude.renta && Array.isArray(etude.renta) && (
-                          <div style={{ marginTop: 8 }}>
-                            <b>Tableau de rentabilité :</b>
-                            <table style={{ width: '100%', marginTop: 4, borderCollapse: 'collapse', fontSize: 14 }}>
-                              <thead>
-                                <tr style={{ background: '#e0e7ff' }}>
-                                  <th style={{ padding: 4, border: '1px solid #c7d2fe' }}>Année</th>
-                                  <th style={{ padding: 4, border: '1px solid #c7d2fe' }}>Gain</th>
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {etude.renta.map((row, i) => (
-                                  <tr key={i}>
-                                    <td style={{ padding: 4, border: '1px solid #c7d2fe' }}>{row.annee}</td>
-                                    <td style={{ padding: 4, border: '1px solid #c7d2fe' }}>{row.gain} €</td>
+        {clients.filter(c => activeTab ? c.emailManager === activeTab : true).map((client) => {
+          // Récupération de l'état projet pour ce client
+          const etat = etatProjet[client.id] || {};
+          const etatsOrder = [
+            { key: 'installe', label: 'Installé' },
+            { key: 'declarationValidee', label: 'Déclaration validée' },
+            { key: 'declarationEnCours', label: 'Déclaration en cours' },
+            { key: 'vendu', label: 'Vendu' },
+            { key: 'attente', label: 'En attente' },
+            { key: 'rdvFait', label: 'RDV fait' }
+          ];
+          const dernierEtat = etatsOrder.find(e => etat[e.key]);
+          return (
+            <li key={client.id} style={{ background: '#f1f5f9', borderRadius: 8, padding: 14, marginBottom: 10 }}>
+              {editId === client.id ? (
+                <form onSubmit={handleSaveEditClient} style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginBottom: 10 }}>
+                  <input type="text" name="nom" placeholder="Nom" value={editClient.nom} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} required />
+                  <input type="text" name="prenom" placeholder="Prénom" value={editClient.prenom} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} required />
+                  <input type="text" name="adresse" placeholder="Adresse" value={editClient.adresse} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} required />
+                  <input type="text" name="ville" placeholder="Ville" value={editClient.ville} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} required />
+                  <input type="email" name="email" placeholder="Adresse mail" value={editClient.email} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} required />
+                  <input type="tel" name="telephone" placeholder="Numéro de téléphone" value={editClient.telephone} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} required />
+                  <input type="number" name="montantFactureEDF" placeholder="Montant facture EDF (€)" value={editClient.montantFactureEDF} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} />
+                  <input type="number" name="ageMR" placeholder="Âge de MR" value={editClient.ageMR} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} />
+                  <input type="number" name="ageMME" placeholder="Âge de Mme" value={editClient.ageMME} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} />
+                  {commerciaux.length > 0 && (
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
+                      {commerciaux.map((c) => {
+                        const hasName = (c.nom && c.nom.trim()) || (c.prenom && c.prenom.trim());
+                        return (
+                          <button
+                            key={c.email}
+                            onClick={() => setActiveTab(c.email)}
+                            style={{
+                              padding: '8px 18px',
+                              background: activeTab === c.email ? '#2563eb' : '#e5e7eb',
+                              color: activeTab === c.email ? '#fff' : '#334155',
+                              border: 'none',
+                              borderRadius: 6,
+                              fontWeight: 600,
+                              fontSize: 16,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {hasName ? `${c.nom || ''} ${c.prenom || ''}`.trim() + ` (${c.email})` : c.email}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <input type="text" name="professionMR" placeholder="Profession de MR" value={editClient.professionMR} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} />
+                  <input type="text" name="professionMME" placeholder="Profession de Mme" value={editClient.professionMME} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} />
+                  <button type="submit" style={{ padding: '6px 14px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Enregistrer</button>
+                  <button type="button" onClick={() => { setEditId(null); setEditClient(null); }} style={{ padding: '6px 14px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Annuler</button>
+                </form>
+              ) : (
+                <>
+                  <div style={{ fontWeight: 600, fontSize: 17 }}>{client.nom} {client.prenom}</div>
+                  <div style={{ color: '#64748b', marginBottom: 4 }}>{client.email} | {client.telephone}</div>
+                  <div style={{ fontSize: 15 }}>{client.adresse}, {client.ville}</div>
+                  <div style={{ fontSize: 15 }}>Facture EDF: {client.montantFactureEDF} €</div>
+                  <div style={{ fontSize: 15 }}>Âge MR: {client.ageMR} | Âge Mme: {client.ageMME}</div>
+                  <div style={{ fontSize: 15 }}>Profession MR: {client.professionMR} | Profession Mme: {client.professionMME}</div>
+                  {/* Affichage des études associées au client */}
+                  {Array.isArray(client.Etude) && client.Etude.length > 0 && (
+                    <div style={{ background: '#e0f2fe', borderRadius: 8, padding: 12, marginTop: 10 }}>
+                      <h4 style={{ marginBottom: 8 }}>Études assignées</h4>
+                      {client.Etude.map((etude, idx) => (
+                        <div key={idx} style={{ marginBottom: 12, padding: 10, background: '#fff', borderRadius: 6, boxShadow: '0 2px 8px #2563eb22' }}>
+                          <div style={{ fontWeight: 600, color: '#2563eb', marginBottom: 4 }}>Étude du {new Date(etude.date).toLocaleDateString('fr-FR')}</div>
+                          <div>Production estimée à l'année : <b>{etude.prodMoyenneKwh} kWh</b></div>
+                          <div>KWh consommés à l'année : <b>{etude.conso} kWh</b></div>
+                          <div>Prime EDF : <b>{etude.prime} €</b></div>
+                          <div>Année de rentabilité : <b>{etude.anneeRentable || etude.nbAnneesRentable || '-'}</b></div>
+                          {/* Tableau de rentabilité si dispo */}
+                          {etude.renta && Array.isArray(etude.renta) && (
+                            <div style={{ marginTop: 8 }}>
+                              <b>Tableau de rentabilité :</b>
+                              <table style={{ width: '100%', marginTop: 4, borderCollapse: 'collapse', fontSize: 14 }}>
+                                <thead>
+                                  <tr style={{ background: '#e0e7ff' }}>
+                                    <th style={{ padding: 4, border: '1px solid #c7d2fe' }}>Année</th>
+                                    <th style={{ padding: 4, border: '1px solid #c7d2fe' }}>Gain</th>
                                   </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                                </thead>
+                                <tbody>
+                                  {etude.renta.map((row, i) => (
+                                    <tr key={i}>
+                                      <td style={{ padding: 4, border: '1px solid #c7d2fe' }}>{row.annee}</td>
+                                      <td style={{ padding: 4, border: '1px solid #c7d2fe' }}>{row.gain} €</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {dernierEtat ? (
+                    <div style={{ marginBottom: 8, fontWeight: 600, color: '#27ae60', fontSize: 15 }}>
+                      Etat projet : {dernierEtat.label}
+                    </div>
+                  ) : (
+                    <div style={{ marginBottom: 8, fontWeight: 600, color: '#64748b', fontSize: 15 }}>
+                      Etat projet : Aucun
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                    <button onClick={() => handleEditClient(client)} style={{ padding: '6px 14px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Modifier</button>
+                    <button onClick={() => handleDeleteClient(client.id)} style={{ padding: '6px 14px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Supprimer</button>
+                    <button onClick={() => setShowUploadId(showUploadId === client.id ? null : client.id)} style={{ padding: '6px 14px', background: '#f59e42', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Importer des docs</button>
+                    <button onClick={() => { setShowDebriefId(client.id); setDebrief(client.debrief || { bien: '', moinsBien: '', ressenti: '', venteEffectuee: '' }); }} style={{ padding: '6px 14px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Débrief RDV</button>
+                    <button onClick={() => handleOpenEtudePerso(client)} style={{ padding: '6px 14px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Etude perso</button>
+                    <button onClick={() => setShowFicheClientId(showFicheClientId === client.id ? null : client.id)} style={{ padding: '6px 14px', background: '#0ea5e9', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Fiche client</button>
+                    <button onClick={() => handleOpenEtatProjet(client.id)} style={{ padding: '6px 14px', background: '#4ade80', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Etat projet</button>
                   </div>
-                )}
-                <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
-                  <button onClick={() => handleEditClient(client)} style={{ padding: '6px 14px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Modifier</button>
-                  <button onClick={() => handleDeleteClient(client.id)} style={{ padding: '6px 14px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Supprimer</button>
-                  <button onClick={() => setShowUploadId(showUploadId === client.id ? null : client.id)} style={{ padding: '6px 14px', background: '#f59e42', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Importer des docs</button>
-                  <button onClick={() => { setShowDebriefId(client.id); setDebrief(client.debrief || { bien: '', moinsBien: '', ressenti: '', venteEffectuee: '' }); }} style={{ padding: '6px 14px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Débrief RDV</button>
-                  <button onClick={() => handleOpenEtudePerso(client)} style={{ padding: '6px 14px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Etude perso</button>
-                </div>
-                {/* MODAL IMPORT DOCS */}
-                {showUploadId === client.id && (
-                  <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(30,41,59,0.65)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ background: '#fff', borderRadius: 18, padding: 0, minWidth: 420, maxWidth: 600, boxShadow: '0 8px 32px #2563eb55', position: 'relative', overflow: 'hidden' }}>
-                      <div style={{ background: 'linear-gradient(90deg,#f59e42 60%,#2563eb 100%)', color: '#fff', padding: '28px 36px 18px 36px', display: 'flex', alignItems: 'center', gap: 18 }}>
-                        <div style={{ width: 54, height: 54, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px #2563eb22', marginRight: 10 }}>
-                          <span style={{ fontSize: 32, color: '#f59e42' }}>📄</span>
+                  {/* MODAL IMPORT DOCS */}
+                  {showUploadId === client.id && (
+                    <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(30,41,59,0.65)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ background: '#fff', borderRadius: 18, padding: 0, minWidth: 420, maxWidth: 600, boxShadow: '0 8px 32px #2563eb55', position: 'relative', overflow: 'hidden' }}>
+                        <div style={{ background: 'linear-gradient(90deg,#f59e42 60%,#2563eb 100%)', color: '#fff', padding: '28px 36px 18px 36px', display: 'flex', alignItems: 'center', gap: 18 }}>
+                          <div style={{ width: 54, height: 54, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px #2563eb22', marginRight: 10 }}>
+                            <span style={{ fontSize: 32, color: '#f59e42' }}>📄</span>
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 22 }}>Importer des documents</div>
+                            <div style={{ fontSize: 15, opacity: 0.85 }}>Clique ou glisse/dépose tes fichiers</div>
+                          </div>
+                          <button onClick={() => setShowUploadId(null)} style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.18)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #2563eb22' }}>✕</button>
                         </div>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: 22 }}>Importer des documents</div>
-                          <div style={{ fontSize: 15, opacity: 0.85 }}>Clique ou glisse/dépose tes fichiers</div>
-                        </div>
-                        <button onClick={() => setShowUploadId(null)} style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.18)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #2563eb22' }}>✕</button>
-                      </div>
-                      <div style={{ padding: '24px 36px 24px 36px' }}>
-                        <div
-                          onDragOver={e => { e.preventDefault(); setDragOverType('all'); }}
-                          onDragLeave={e => { e.preventDefault(); setDragOverType(null); }}
-                          onDrop={async e => {
-                            e.preventDefault();
-                            setDragOverType(null);
-                            const files = Array.from(e.dataTransfer.files);
-                            await handleUploadFiles(client.id, files);
-                          }}
-                          style={{
-                            border: dragOverType ? '2px dashed #2563eb' : '2px dashed #d1d5db',
-                            background: dragOverType ? '#dbeafe' : '#f8fafc',
-                            borderRadius: 12,
-                            padding: 32,
-                            textAlign: 'center',
-                            marginBottom: 18,
-                            cursor: 'pointer',
-                            transition: 'all 0.15s',
-                          }}
-                        >
-                          <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>Glisse/dépose tes fichiers ici</div>
-                          <div style={{ fontSize: 15, color: '#64748b', marginBottom: 12 }}>ou sélectionne un type de document à importer :</div>
-                          <input
-                            type="file"
-                            multiple
-                            style={{ display: 'none' }}
-                            id={`file-input-${client.id}`}
-                            onChange={async e => {
-                              const files = Array.from(e.target.files);
+                        <div style={{ padding: '24px 36px 24px 36px' }}>
+                          <div
+                            onDragOver={e => { e.preventDefault(); setDragOverType('all'); }}
+                            onDragLeave={e => { e.preventDefault(); setDragOverType(null); }}
+                            onDrop={async e => {
+                              e.preventDefault();
+                              setDragOverType(null);
+                              const files = Array.from(e.dataTransfer.files);
                               await handleUploadFiles(client.id, files);
                             }}
-                          />
-                          <label htmlFor={`file-input-${client.id}`} style={{ display: 'inline-block', background: '#2563eb', color: '#fff', padding: '10px 22px', borderRadius: 8, fontWeight: 700, fontSize: 16, cursor: 'pointer', marginBottom: 12 }}>Sélectionner des fichiers</label>
-                          <div style={{ marginTop: 18, display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>
-                            {docTypes.map(type => (
-                              <div key={type} style={{ background: '#f1f5f9', borderRadius: 8, padding: '8px 18px', fontWeight: 600, fontSize: 15, color: '#2563eb', border: '1px solid #d1d5db' }}>{type}</div>
-                            ))}
+                            style={{
+                              border: dragOverType ? '2px dashed #2563eb' : '2px dashed #d1d5db',
+                              background: dragOverType ? '#dbeafe' : '#f8fafc',
+                              borderRadius: 12,
+                              padding: 32,
+                              textAlign: 'center',
+                              marginBottom: 18,
+                              cursor: 'pointer',
+                              transition: 'all 0.15s',
+                            }}
+                          >
+                            <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>Glisse/dépose tes fichiers ici</div>
+                            <div style={{ fontSize: 15, color: '#64748b', marginBottom: 12 }}>ou sélectionne un type de document à importer :</div>
+                            <input
+                              type="file"
+                              multiple
+                              style={{ display: 'none' }}
+                              id={`file-input-${client.id}`}
+                              onChange={async e => {
+                                const files = Array.from(e.target.files);
+                                await handleUploadFiles(client.id, files);
+                              }}
+                            />
+                            <label htmlFor={`file-input-${client.id}`} style={{ display: 'inline-block', background: '#2563eb', color: '#fff', padding: '10px 22px', borderRadius: 8, fontWeight: 700, fontSize: 16, cursor: 'pointer', marginBottom: 12 }}>Sélectionner des fichiers</label>
+                            <div style={{ marginTop: 18, display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>
+                              {docTypes.map(type => (
+                                <div key={type} style={{ background: '#f1f5f9', borderRadius: 8, padding: '8px 18px', fontWeight: 600, fontSize: 15, color: '#2563eb', border: '1px solid #d1d5db' }}>{type}</div>
+                              ))}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right', marginTop: 18 }}>
+                            <button onClick={() => setShowUploadId(null)} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #ef444422' }}>Fermer</button>
                           </div>
                         </div>
-                        <div style={{ textAlign: 'right', marginTop: 18 }}>
-                          <button onClick={() => setShowUploadId(null)} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #ef444422' }}>Fermer</button>
+                      </div>
+                    </div>
+                  )}
+                  {/* MODAL ÉTUDE PERSO */}
+                  {showEtudePersoId === client.id && (
+                    <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(30,41,59,0.65)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ background: '#fff', borderRadius: 18, padding: 0, minWidth: 420, maxWidth: 600, boxShadow: '0 8px 32px #2563eb55', position: 'relative', overflow: 'hidden' }}>
+                        <div style={{ background: 'linear-gradient(90deg,#2563eb 60%,#6366f1 100%)', color: '#fff', padding: '28px 36px 18px 36px', display: 'flex', alignItems: 'center', gap: 18 }}>
+                          <div style={{ width: 54, height: 54, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px #2563eb22', marginRight: 10 }}>
+                            <span style={{ fontSize: 32, color: '#2563eb' }}>⚡</span>
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 22 }}>Étude perso - équipements du foyer</div>
+                            <div style={{ fontSize: 15, opacity: 0.85 }}>Sélectionne les équipements présents chez le client</div>
+                          </div>
+                          <button onClick={() => setShowEtudePersoId(null)} style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.18)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #2563eb22' }}>✕</button>
+                        </div>
+                        <div style={{ padding: '24px 36px 0 36px' }}>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+                            {etudePersoElements.map(el => (
+                              <div key={el.key} style={{ marginBottom: 8 }}>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    if (el.type === 'bool') handleChangeEtudePerso(el.key, !etudePerso[el.key]);
+                                  }}
+                                  style={{
+                                    minWidth: 180,
+                                    minHeight: 48,
+                                    background: el.type === 'bool' && etudePerso[el.key] ? '#2563eb' : '#f1f5f9',
+                                    color: el.type === 'bool' && etudePerso[el.key] ? '#fff' : '#334155',
+                                    border: '2px solid ' + (el.type === 'bool' && etudePerso[el.key] ? '#2563eb' : '#d1d5db'),
+                                    borderRadius: 10,
+                                    fontWeight: 600,
+                                    fontSize: 16,
+                                    cursor: el.type === 'bool' ? 'pointer' : 'default',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    position: 'relative',
+                                    marginBottom: 2,
+                                    boxShadow: el.type === 'bool' && etudePerso[el.key] ? '0 2px 8px #2563eb22' : 'none',
+                                    transition: 'all 0.15s',
+                                  }}
+                                >
+                                  <span style={{ flex: 1 }}>{el.label}</span>
+                                  {el.type === 'number' && (
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      value={etudePerso[el.key]}
+                                      onClick={e => e.stopPropagation()}
+                                      onChange={e => handleChangeEtudePerso(el.key, Number(e.target.value))}
+                                      style={{
+                                        width: 60,
+                                        borderRadius: 6,
+                                        border: '1px solid #d1d5db',
+                                        padding: 6,
+                                        marginLeft: 12,
+                                      }}
+                                    />
+                                  )}
+                                  {el.type === 'text' && (
+                                    <input
+                                      type="text"
+                                      value={etudePerso[el.key]}
+                                      onClick={e => e.stopPropagation()}
+                                      onChange={e => handleChangeEtudePerso(el.key, e.target.value)}
+                                      style={{
+                                        width: 160,
+                                        borderRadius: 6,
+                                        border: '1px solid #d1d5db',
+                                        padding: 6,
+                                        marginLeft: 12,
+                                      }}
+                                    />
+                                  )}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                          <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+                            <button onClick={() => handleSaveEtudePerso(client.id)} style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 17, cursor: 'pointer', boxShadow: '0 2px 8px #10b98122' }}>Enregistrer</button>
+                            <button onClick={() => setShowEtudePersoId(null)} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 17, cursor: 'pointer', boxShadow: '0 2px 8px #ef444422' }}>Annuler</button>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
-                {/* MODAL ÉTUDE PERSO */}
-                {showEtudePersoId === client.id && (
-                  <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(30,41,59,0.65)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ background: '#fff', borderRadius: 18, padding: 0, minWidth: 420, maxWidth: 600, boxShadow: '0 8px 32px #2563eb55', position: 'relative', overflow: 'hidden' }}>
-                      <div style={{ background: 'linear-gradient(90deg,#2563eb 60%,#6366f1 100%)', color: '#fff', padding: '28px 36px 18px 36px', display: 'flex', alignItems: 'center', gap: 18 }}>
-                        <div style={{ width: 54, height: 54, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px #2563eb22', marginRight: 10 }}>
-                          <span style={{ fontSize: 32, color: '#2563eb' }}>⚡</span>
+                  )}
+                  {/* MODAL DEBRIEF RDV */}
+                  {showDebriefId === client.id && (
+                    <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(30,41,59,0.65)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ background: '#fff', borderRadius: 18, padding: 0, minWidth: 420, maxWidth: 600, boxShadow: '0 8px 32px #6366f155', position: 'relative', overflow: 'hidden' }}>
+                        <div style={{ background: 'linear-gradient(90deg,#6366f1 60%,#2563eb 100%)', color: '#fff', padding: '28px 36px 18px 36px', display: 'flex', alignItems: 'center', gap: 18 }}>
+                          <div style={{ width: 54, height: 54, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px #6366f122', marginRight: 10 }}>
+                            <span style={{ fontSize: 32, color: '#6366f1' }}>📝</span>
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 22 }}>Débrief RDV</div>
+                            <div style={{ fontSize: 15, opacity: 0.85 }}>Renseigne le ressenti et les points du rendez-vous</div>
+                          </div>
+                          <button onClick={() => setShowDebriefId(null)} style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.18)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #6366f122' }}>✕</button>
                         </div>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: 22 }}>Étude perso - équipements du foyer</div>
-                          <div style={{ fontSize: 15, opacity: 0.85 }}>Sélectionne les équipements présents chez le client</div>
-                        </div>
-                        <button onClick={() => setShowEtudePersoId(null)} style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.18)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #2563eb22' }}>✕</button>
+                        <form style={{ padding: '24px 36px 24px 36px' }} onSubmit={async e => {
+                          e.preventDefault();
+                          await updateDoc(doc(db, 'clients', client.id), { debrief });
+                          setShowDebriefId(null);
+                          // Optionnel: refresh clients
+                          if (user) {
+                            const q = query(collection(db, 'clients'), where('emailManager', '==', user.email));
+                            const snap = await getDocs(q);
+                            const refreshed = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                            setClients([...refreshed].reverse());
+                          }
+                        }}>
+                          <div style={{ marginBottom: 14 }}>
+                            <label style={{ fontWeight: 600 }}>Points positifs :</label><br />
+                            <textarea value={debrief.bien} onChange={e => setDebrief(prev => ({ ...prev, bien: e.target.value }))} style={{ width: '100%', minHeight: 40, borderRadius: 6, border: '1px solid #d1d5db', padding: 8, fontSize: 15 }} />
+                          </div>
+                          <div style={{ marginBottom: 14 }}>
+                            <label style={{ fontWeight: 600 }}>Points à améliorer :</label><br />
+                            <textarea value={debrief.moinsBien} onChange={e => setDebrief(prev => ({ ...prev, moinsBien: e.target.value }))} style={{ width: '100%', minHeight: 40, borderRadius: 6, border: '1px solid #d1d5db', padding: 8, fontSize: 15 }} />
+                          </div>
+                          <div style={{ marginBottom: 14 }}>
+                            <label style={{ fontWeight: 600 }}>Ressenti général :</label><br />
+                            <textarea value={debrief.ressenti} onChange={e => setDebrief(prev => ({ ...prev, ressenti: e.target.value }))} style={{ width: '100%', minHeight: 40, borderRadius: 6, border: '1px solid #d1d5db', padding: 8, fontSize: 15 }} />
+                          </div>
+                          <div style={{ marginBottom: 14 }}>
+                            <label style={{ fontWeight: 600 }}>Vente effectuée :</label><br />
+                            <select value={debrief.venteEffectuee} onChange={e => setDebrief(prev => ({ ...prev, venteEffectuee: e.target.value }))} style={{ width: '100%', borderRadius: 6, border: '1px solid #d1d5db', padding: 8, fontSize: 15 }}>
+                              <option value="">Sélectionner</option>
+                              <option value="oui">Oui</option>
+                              <option value="non">Non</option>
+                              <option value="en attente">En attente</option>
+                            </select>
+                          </div>
+                          <div style={{ display: 'flex', gap: 12, marginTop: 24, justifyContent: 'flex-end' }}>
+                            <button type="submit" style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 17, cursor: 'pointer', boxShadow: '0 2px 8px #10b98122' }}>Enregistrer</button>
+                            <button type="button" onClick={() => setShowDebriefId(null)} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 17, cursor: 'pointer', boxShadow: '0 2px 8px #ef444422' }}>Annuler</button>
+                          </div>
+                        </form>
                       </div>
-                      <div style={{ padding: '24px 36px 0 36px' }}>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
-                          {etudePersoElements.map(el => (
-                            <div key={el.key} style={{ marginBottom: 8 }}>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (el.type === 'bool') handleChangeEtudePerso(el.key, !etudePerso[el.key]);
-                                }}
-                                style={{
-                                  minWidth: 180,
-                                  minHeight: 48,
-                                  background: el.type === 'bool' && etudePerso[el.key] ? '#2563eb' : '#f1f5f9',
-                                  color: el.type === 'bool' && etudePerso[el.key] ? '#fff' : '#334155',
-                                  border: '2px solid ' + (el.type === 'bool' && etudePerso[el.key] ? '#2563eb' : '#d1d5db'),
-                                  borderRadius: 10,
-                                  fontWeight: 600,
-                                  fontSize: 16,
-                                  cursor: el.type === 'bool' ? 'pointer' : 'default',
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  justifyContent: 'center',
-                                  position: 'relative',
-                                  marginBottom: 2,
-                                  boxShadow: el.type === 'bool' && etudePerso[el.key] ? '0 2px 8px #2563eb22' : 'none',
-                                  transition: 'all 0.15s',
-                                }}
-                              >
-                                <span style={{ flex: 1 }}>{el.label}</span>
-                                {el.type === 'number' && (
-                                  <input
-                                    type="number"
-                                    min={0}
-                                    value={etudePerso[el.key]}
-                                    onClick={e => e.stopPropagation()}
-                                    onChange={e => handleChangeEtudePerso(el.key, Number(e.target.value))}
-                                    style={{
-                                      width: 60,
-                                      borderRadius: 6,
-                                      border: '1px solid #d1d5db',
-                                      padding: 6,
-                                      marginLeft: 12,
-                                    }}
-                                  />
+                    </div>
+                  )}
+                  {/* MODAL FICHE CLIENT */}
+                  {showFicheClientId === client.id && (
+                    <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(30,41,59,0.65)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ background: '#fff', borderRadius: 18, padding: 0, minWidth: 420, maxWidth: 600, boxShadow: '0 8px 32px #0ea5e955', position: 'relative', overflow: 'hidden' }}>
+                        <div style={{ background: 'linear-gradient(90deg,#0ea5e9 60%,#2563eb 100%)', color: '#fff', padding: '28px 36px 18px 36px', display: 'flex', alignItems: 'center', gap: 18 }}>
+                          <div style={{ width: 54, height: 54, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px #2563eb22', marginRight: 10 }}>
+                            <span style={{ fontSize: 32, color: '#0ea5e9' }}>👤</span>
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 22 }}>Fiche client</div>
+                            <div style={{ fontSize: 15, opacity: 0.85 }}>Récapitulatif complet du client</div>
+                          </div>
+                          <button onClick={() => setShowFicheClientId(null)} style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.18)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #2563eb22' }}>✕</button>
+                        </div>
+                        <div style={{ padding: '24px 36px 24px 36px' }}>
+                          <h4 style={{ marginBottom: 10, color: '#2563eb' }}>Infos client</h4>
+                          <div><b>Nom:</b> {client.nom}</div>
+                          <div><b>Prénom:</b> {client.prenom}</div>
+                          <div><b>Email:</b> {client.email}</div>
+                          <div><b>Téléphone:</b> {client.telephone}</div>
+                          <div><b>Adresse:</b> {client.adresse}, {client.ville}</div>
+                          <div><b>Facture EDF:</b> {client.montantFactureEDF} €</div>
+                          <div><b>Âge MR:</b> {client.ageMR} | <b>Âge Mme:</b> {client.ageMME}</div>
+                          <div><b>Profession MR:</b> {client.professionMR} | <b>Profession Mme:</b> {client.professionMME}</div>
+                          <hr style={{ margin: '18px 0' }} />
+                          <h4 style={{ marginBottom: 10, color: '#2563eb' }}>Équipements étude perso</h4>
+                          {client.etudePerso ? (
+                            <ul style={{ paddingLeft: 18 }}>
+                              {Object.entries(client.etudePerso).map(([key, value]) => (
+                                value && typeof value === 'boolean' ? (
+                                  <li key={key}>{etudePersoElements.find(e => e.key === key)?.label || key}</li>
+                                ) : null
+                              ))}
+                              {Object.entries(client.etudePerso).map(([key, value]) => (
+                                typeof value === 'number' && value > 0 ? (
+                                  <li key={key}>{etudePersoElements.find(e => e.key === key)?.label || key}: {value}</li>
+                                ) : null
+                              ))}
+                              {client.etudePerso.autres && (
+                                <li><b>Autres:</b> {client.etudePerso.autres}</li>
+                              )}
+                            </ul>
+                          ) : (
+                            <div style={{ color: '#64748b' }}>Aucune étude perso renseignée.</div>
+                          )}
+                          <hr style={{ margin: '18px 0' }} />
+                          <h4 style={{ marginBottom: 10, color: '#2563eb' }}>Étude calculateur</h4>
+                          {Array.isArray(client.Etude) && client.Etude.length > 0 ? (
+                            client.Etude.map((etude, idx) => (
+                              <div key={idx} style={{ marginBottom: 12, padding: 10, background: '#f8fafc', borderRadius: 6 }}>
+                                <div><b>Date:</b> {new Date(etude.date).toLocaleDateString('fr-FR')}</div>
+                                <div><b>Production estimée:</b> {etude.prodMoyenneKwh} kWh</div>
+                                <div><b>Consommation annuelle:</b> {etude.conso} kWh</div>
+                                <div><b>Prime EDF:</b> {etude.prime} €</div>
+                                <div><b>Année de rentabilité:</b> {etude.anneeRentable || etude.nbAnneesRentable || '-'}</div>
+                                {etude.renta && Array.isArray(etude.renta) && (
+                                  <div style={{ marginTop: 8 }}>
+                                    <b>Tableau de rentabilité:</b>
+                                    <table style={{ width: '100%', marginTop: 4, borderCollapse: 'collapse', fontSize: 14 }}>
+                                      <thead>
+                                        <tr style={{ background: '#e0e7ff' }}>
+                                          <th style={{ padding: 4, border: '1px solid #c7d2fe' }}>Année</th>
+                                          <th style={{ padding: 4, border: '1px solid #c7d2fe' }}>Gain</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody>
+                                        {etude.renta.map((row, i) => (
+                                          <tr key={i}>
+                                            <td style={{ padding: 4, border: '1px solid #c7d2fe' }}>{row.annee}</td>
+                                            <td style={{ padding: 4, border: '1px solid #c7d2fe' }}>{row.gain} €</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
                                 )}
-                                {el.type === 'text' && (
-                                  <input
-                                    type="text"
-                                    value={etudePerso[el.key]}
-                                    onClick={e => e.stopPropagation()}
-                                    onChange={e => handleChangeEtudePerso(el.key, e.target.value)}
-                                    style={{
-                                      width: 160,
-                                      borderRadius: 6,
-                                      border: '1px solid #d1d5db',
-                                      padding: 6,
-                                      marginLeft: 12,
-                                    }}
-                                  />
-                                )}
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                        <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
-                          <button onClick={() => handleSaveEtudePerso(client.id)} style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 17, cursor: 'pointer', boxShadow: '0 2px 8px #10b98122' }}>Enregistrer</button>
-                          <button onClick={() => setShowEtudePersoId(null)} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 17, cursor: 'pointer', boxShadow: '0 2px 8px #ef444422' }}>Annuler</button>
+                              </div>
+                            ))
+                          ) : (
+                            <div style={{ color: '#64748b' }}>Aucune étude calculateur renseignée.</div>
+                          )}
+                          <div style={{ textAlign: 'right', marginTop: 18 }}>
+                            <button onClick={() => setShowFicheClientId(null)} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #ef444422' }}>Fermer</button>
+                                                   </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                )}
-                {/* MODAL DEBRIEF RDV */}
-                {showDebriefId === client.id && (
-                  <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(30,41,59,0.65)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ background: '#fff', borderRadius: 18, padding: 0, minWidth: 420, maxWidth: 600, boxShadow: '0 8px 32px #6366f155', position: 'relative', overflow: 'hidden' }}>
-                      <div style={{ background: 'linear-gradient(90deg,#6366f1 60%,#2563eb 100%)', color: '#fff', padding: '28px 36px 18px 36px', display: 'flex', alignItems: 'center', gap: 18 }}>
-                        <div style={{ width: 54, height: 54, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px #6366f122', marginRight: 10 }}>
-                          <span style={{ fontSize: 32, color: '#6366f1' }}>📝</span>
+                  )}
+                  {/* MODAL ÉTAT PROJET */}
+                  {showEtatProjetId && (
+                    <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(30,41,59,0.65)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ background: '#fff', borderRadius: 18, padding: 0, minWidth: 420, maxWidth: 600, boxShadow: '0 8px 32px #4ade8055', position: 'relative', overflow: 'hidden' }}>
+                        <div style={{ background: 'linear-gradient(90deg,#4ade80 60%,#2563eb 100%)', color: '#fff', padding: '28px 36px 18px 36px', display: 'flex', alignItems: 'center', gap: 18 }}>
+                          <div style={{ width: 54, height: 54, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px #4ade8022', marginRight: 10 }}>
+                            <span style={{ fontSize: 32, color: '#4ade80' }}>📊</span>
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 700, fontSize: 22 }}>Etat du projet</div>
+                            <div style={{ fontSize: 15, opacity: 0.85 }}>Coche les étapes validées du projet</div>
+                          </div>
+                          <button onClick={() => setShowEtatProjetId(null)} style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.18)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px  16px', fontWeight: 600, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #4ade8022' }}>✕</button>
                         </div>
-                        <div>
-                          <div style={{ fontWeight: 700, fontSize: 22 }}>Débrief RDV</div>
-                          <div style={{ fontSize: 15, opacity: 0.85 }}>Renseigne le ressenti et les points du rendez-vous</div>
+                        <div style={{ padding: '24px 36px 24px 36px' }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem', color: '#34495e' }}>
+                              <input type="checkbox" checked={etatProjet.rdvFait} onChange={e => handleChangeEtatProjet('rdvFait', e.target.checked)} /> RDV fait
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem', color: '#34495e' }}>
+                              <input type="checkbox" checked={etatProjet.attente} onChange={e => handleChangeEtatProjet('attente', e.target.checked)} /> En attente
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem', color: '#34495e' }}>
+                              <input type="checkbox" checked={etatProjet.vendu} onChange={e => handleChangeEtatProjet('vendu', e.target.checked)} /> Vendu
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem', color: '#34495e' }}>
+                              <input type="checkbox" checked={etatProjet.declarationEnCours} onChange={e => handleChangeEtatProjet('declarationEnCours', e.target.checked)} /> Déclaration en cours
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem', color: '#34495e' }}>
+                              <input type="checkbox" checked={etatProjet.declarationValidee} onChange={e => handleChangeEtatProjet('declarationValidee', e.target.checked)} /> Déclaration validée
+                            </label>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem', color: '#34495e' }}>
+                              <input type="checkbox" checked={etatProjet.installe} onChange={e => handleChangeEtatProjet('installe', e.target.checked)} /> Installé
+                            </label>
+                          </div>
+                          <div style={{ textAlign: 'right', marginTop: 24 }}>
+                            <button style={{ background: '#27ae60', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #27ae6022', marginRight: 10 }} onClick={() => handleSaveEtatProjet(showEtatProjetId)}>Sauvegarder</button>
+                            <button style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #ef444422' }} onClick={() => setShowEtatProjetId(null)}>Fermer</button>
+                          </div>
                         </div>
-                        <button onClick={() => setShowDebriefId(null)} style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.18)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #6366f122' }}>✕</button>
                       </div>
-                      <form style={{ padding: '24px 36px 24px 36px' }} onSubmit={async e => {
-                        e.preventDefault();
-                        await updateDoc(doc(db, 'clients', client.id), { debrief });
-                        setShowDebriefId(null);
-                        // Optionnel: refresh clients
-                        if (user) {
-                          const q = query(collection(db, 'clients'), where('emailManager', '==', user.email));
-                          const snap = await getDocs(q);
-                          const refreshed = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                          setClients([...refreshed].reverse());
-                        }
-                      }}>
-                        <div style={{ marginBottom: 14 }}>
-                          <label style={{ fontWeight: 600 }}>Points positifs :</label><br />
-                          <textarea value={debrief.bien} onChange={e => setDebrief(prev => ({ ...prev, bien: e.target.value }))} style={{ width: '100%', minHeight: 40, borderRadius: 6, border: '1px solid #d1d5db', padding: 8, fontSize: 15 }} />
-                        </div>
-                        <div style={{ marginBottom: 14 }}>
-                          <label style={{ fontWeight: 600 }}>Points à améliorer :</label><br />
-                          <textarea value={debrief.moinsBien} onChange={e => setDebrief(prev => ({ ...prev, moinsBien: e.target.value }))} style={{ width: '100%', minHeight: 40, borderRadius: 6, border: '1px solid #d1d5db', padding: 8, fontSize: 15 }} />
-                        </div>
-                        <div style={{ marginBottom: 14 }}>
-                          <label style={{ fontWeight: 600 }}>Ressenti général :</label><br />
-                          <textarea value={debrief.ressenti} onChange={e => setDebrief(prev => ({ ...prev, ressenti: e.target.value }))} style={{ width: '100%', minHeight: 40, borderRadius: 6, border: '1px solid #d1d5db', padding: 8, fontSize: 15 }} />
-                        </div>
-                        <div style={{ marginBottom: 14 }}>
-                          <label style={{ fontWeight: 600 }}>Vente effectuée :</label><br />
-                          <select value={debrief.venteEffectuee} onChange={e => setDebrief(prev => ({ ...prev, venteEffectuee: e.target.value }))} style={{ width: '100%', borderRadius: 6, border: '1px solid #d1d5db', padding: 8, fontSize: 15 }}>
-                            <option value="">Sélectionner</option>
-                            <option value="oui">Oui</option>
-                            <option value="non">Non</option>
-                            <option value="en attente">En attente</option>
-                          </select>
-                        </div>
-                        <div style={{ display: 'flex', gap: 12, marginTop: 24, justifyContent: 'flex-end' }}>
-                          <button type="submit" style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 17, cursor: 'pointer', boxShadow: '0 2px 8px #10b98122' }}>Enregistrer</button>
-                          <button type="button" onClick={() => setShowDebriefId(null)} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 17, cursor: 'pointer', boxShadow: '0 2px 8px #ef444422' }}>Annuler</button>
-                        </div>
-                      </form>
                     </div>
-                  </div>
-                )}
-              </>
-            )}
-          </li>
-        ))}
+                  )}
+                </>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </div>
   );
