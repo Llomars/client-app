@@ -80,18 +80,18 @@ export default function MesClients() {
   const [showUploadId, setShowUploadId] = useState(null);
   const [showDebriefId, setShowDebriefId] = useState(null);
   const [debrief, setDebrief] = useState({ bien: '', moinsBien: '', ressenti: '', venteEffectuee: '' });
-  // const docTypes = [
-  //   'PI',
-  //   'Facture EDF',
-  //   'RIB',
-  //   'Avis d’impots',
-  //   'Taxe Fonciere',
-  //   'Dernieres fiches de paies',
-  //   'Devis',
-  //   'Facture',
-  //   'Plan de masse',
-  // ];
-  // const [dragOverType, setDragOverType] = useState(null);
+  const docTypes = [
+    'PI',
+    'Facture EDF',
+    'RIB',
+    'Avis d’impots',
+    'Taxe Fonciere',
+    'Dernieres fiches de paies',
+    'Devis',
+    'Facture',
+    'Plan de masse',
+  ];
+  const [dragOverType, setDragOverType] = useState(null);
 
   // Ajout gestion du statut vendu local
   const handleVendu = async (id) => {
@@ -708,97 +708,231 @@ export default function MesClients() {
                   <button onClick={() => { setShowDebriefId(client.id); setDebrief(client.debrief || { bien: '', moinsBien: '', ressenti: '', venteEffectuee: '' }); }} style={{ padding: '6px 14px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Débrief RDV</button>
                   <button onClick={() => handleOpenEtudePerso(client)} style={{ padding: '6px 14px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Etude perso</button>
                 </div>
+                {/* MODAL IMPORT DOCS */}
+                {showUploadId === client.id && (
+                  <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(30,41,59,0.65)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ background: '#fff', borderRadius: 18, padding: 0, minWidth: 420, maxWidth: 600, boxShadow: '0 8px 32px #2563eb55', position: 'relative', overflow: 'hidden' }}>
+                      <div style={{ background: 'linear-gradient(90deg,#f59e42 60%,#2563eb 100%)', color: '#fff', padding: '28px 36px 18px 36px', display: 'flex', alignItems: 'center', gap: 18 }}>
+                        <div style={{ width: 54, height: 54, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px #2563eb22', marginRight: 10 }}>
+                          <span style={{ fontSize: 32, color: '#f59e42' }}>📄</span>
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 22 }}>Importer des documents</div>
+                          <div style={{ fontSize: 15, opacity: 0.85 }}>Clique ou glisse/dépose tes fichiers</div>
+                        </div>
+                        <button onClick={() => setShowUploadId(null)} style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.18)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #2563eb22' }}>✕</button>
+                      </div>
+                      <div style={{ padding: '24px 36px 24px 36px' }}>
+                        <div
+                          onDragOver={e => { e.preventDefault(); setDragOverType('all'); }}
+                          onDragLeave={e => { e.preventDefault(); setDragOverType(null); }}
+                          onDrop={async e => {
+                            e.preventDefault();
+                            setDragOverType(null);
+                            const files = Array.from(e.dataTransfer.files);
+                            await handleUploadFiles(client.id, files);
+                          }}
+                          style={{
+                            border: dragOverType ? '2px dashed #2563eb' : '2px dashed #d1d5db',
+                            background: dragOverType ? '#dbeafe' : '#f8fafc',
+                            borderRadius: 12,
+                            padding: 32,
+                            textAlign: 'center',
+                            marginBottom: 18,
+                            cursor: 'pointer',
+                            transition: 'all 0.15s',
+                          }}
+                        >
+                          <div style={{ fontSize: 18, fontWeight: 600, marginBottom: 8 }}>Glisse/dépose tes fichiers ici</div>
+                          <div style={{ fontSize: 15, color: '#64748b', marginBottom: 12 }}>ou sélectionne un type de document à importer :</div>
+                          <input
+                            type="file"
+                            multiple
+                            style={{ display: 'none' }}
+                            id={`file-input-${client.id}`}
+                            onChange={async e => {
+                              const files = Array.from(e.target.files);
+                              await handleUploadFiles(client.id, files);
+                            }}
+                          />
+                          <label htmlFor={`file-input-${client.id}`} style={{ display: 'inline-block', background: '#2563eb', color: '#fff', padding: '10px 22px', borderRadius: 8, fontWeight: 700, fontSize: 16, cursor: 'pointer', marginBottom: 12 }}>Sélectionner des fichiers</label>
+                          <div style={{ marginTop: 18, display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>
+                            {docTypes.map(type => (
+                              <div key={type} style={{ background: '#f1f5f9', borderRadius: 8, padding: '8px 18px', fontWeight: 600, fontSize: 15, color: '#2563eb', border: '1px solid #d1d5db' }}>{type}</div>
+                            ))}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: 'right', marginTop: 18 }}>
+                          <button onClick={() => setShowUploadId(null)} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #ef444422' }}>Fermer</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {/* MODAL ÉTUDE PERSO */}
                 {showEtudePersoId === client.id && (
-  <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(30,41,59,0.65)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-    <div style={{ background: '#fff', borderRadius: 18, padding: 0, minWidth: 420, maxWidth: 600, boxShadow: '0 8px 32px #2563eb55', position: 'relative', overflow: 'hidden' }}>
-      <div style={{ background: 'linear-gradient(90deg,#2563eb 60%,#6366f1 100%)', color: '#fff', padding: '28px 36px 18px 36px', display: 'flex', alignItems: 'center', gap: 18 }}>
-        <div style={{ width: 54, height: 54, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px #2563eb22', marginRight: 10 }}>
-          <span style={{ fontSize: 32, color: '#2563eb' }}>⚡</span>
-        </div>
-        <div>
-          <div style={{ fontWeight: 700, fontSize: 22 }}>Étude perso - éléments de conso</div>
-          <div style={{ fontSize: 15, opacity: 0.85 }}>Sélectionne les équipements du foyer</div>
-        </div>
-        <button onClick={() => setShowEtudePersoId(null)} style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.18)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #2563eb22' }}>✕</button>
-      </div>
-      <div style={{ padding: '24px 36px 0 36px' }}>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
-          {etudePersoElements.map(el => (
-            <div key={el.key} style={{ marginBottom: 8 }}>
-              <button
-                type="button"
-                onClick={() => {
-                  if (el.type === 'bool') handleChangeEtudePerso(el.key, !etudePerso[el.key]);
-                }}
-                style={{
-                  minWidth: 180,
-                  minHeight: 48,
-                  background: el.type === 'bool' && etudePerso[el.key] ? '#2563eb' : '#f1f5f9',
-                  color: el.type === 'bool' && etudePerso[el.key] ? '#fff' : '#334155',
-                  border: '2px solid ' + (el.type === 'bool' && etudePerso[el.key] ? '#2563eb' : '#d1d5db'),
-                  borderRadius: 10,
-                  fontWeight: 600,
-                  fontSize: 16,
-                  cursor: el.type === 'bool' ? 'pointer' : 'default',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  position: 'relative',
-                  marginBottom: 2,
-                  boxShadow: el.type === 'bool' && etudePerso[el.key] ? '0 2px 8px #2563eb22' : 'none',
-                  transition: 'all 0.15s',
-                }}
-              >
-                <span style={{ flex: 1 }}>{el.label}</span>
-                {el.type === 'number' && (
-                  <input
-                    type="number"
-                    min={0}
-                    value={etudePerso[el.key]}
-                    onClick={e => e.stopPropagation()}
-                    onChange={e => handleChangeEtudePerso(el.key, Number(e.target.value))}
-                    style={{
-                      width: 60,
-                      borderRadius: 6,
-                      border: '1px solid #d1d5db',
-                      padding: 6,
-                      marginLeft: 12,
-                    }}
-                  />
+                  <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(30,41,59,0.65)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ background: '#fff', borderRadius: 18, padding: 0, minWidth: 420, maxWidth: 600, boxShadow: '0 8px 32px #2563eb55', position: 'relative', overflow: 'hidden' }}>
+                      <div style={{ background: 'linear-gradient(90deg,#2563eb 60%,#6366f1 100%)', color: '#fff', padding: '28px 36px 18px 36px', display: 'flex', alignItems: 'center', gap: 18 }}>
+                        <div style={{ width: 54, height: 54, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px #2563eb22', marginRight: 10 }}>
+                          <span style={{ fontSize: 32, color: '#2563eb' }}>⚡</span>
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 22 }}>Étude perso - équipements du foyer</div>
+                          <div style={{ fontSize: 15, opacity: 0.85 }}>Sélectionne les équipements présents chez le client</div>
+                        </div>
+                        <button onClick={() => setShowEtudePersoId(null)} style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.18)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #2563eb22' }}>✕</button>
+                      </div>
+                      <div style={{ padding: '24px 36px 0 36px' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
+                          {etudePersoElements.map(el => (
+                            <div key={el.key} style={{ marginBottom: 8 }}>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (el.type === 'bool') handleChangeEtudePerso(el.key, !etudePerso[el.key]);
+                                }}
+                                style={{
+                                  minWidth: 180,
+                                  minHeight: 48,
+                                  background: el.type === 'bool' && etudePerso[el.key] ? '#2563eb' : '#f1f5f9',
+                                  color: el.type === 'bool' && etudePerso[el.key] ? '#fff' : '#334155',
+                                  border: '2px solid ' + (el.type === 'bool' && etudePerso[el.key] ? '#2563eb' : '#d1d5db'),
+                                  borderRadius: 10,
+                                  fontWeight: 600,
+                                  fontSize: 16,
+                                  cursor: el.type === 'bool' ? 'pointer' : 'default',
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  justifyContent: 'center',
+                                  position: 'relative',
+                                  marginBottom: 2,
+                                  boxShadow: el.type === 'bool' && etudePerso[el.key] ? '0 2px 8px #2563eb22' : 'none',
+                                  transition: 'all 0.15s',
+                                }}
+                              >
+                                <span style={{ flex: 1 }}>{el.label}</span>
+                                {el.type === 'number' && (
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    value={etudePerso[el.key]}
+                                    onClick={e => e.stopPropagation()}
+                                    onChange={e => handleChangeEtudePerso(el.key, Number(e.target.value))}
+                                    style={{
+                                      width: 60,
+                                      borderRadius: 6,
+                                      border: '1px solid #d1d5db',
+                                      padding: 6,
+                                      marginLeft: 12,
+                                    }}
+                                  />
+                                )}
+                                {el.type === 'text' && (
+                                  <input
+                                    type="text"
+                                    value={etudePerso[el.key]}
+                                    onClick={e => e.stopPropagation()}
+                                    onChange={e => handleChangeEtudePerso(el.key, e.target.value)}
+                                    style={{
+                                      width: 160,
+                                      borderRadius: 6,
+                                      border: '1px solid #d1d5db',
+                                      padding: 6,
+                                      marginLeft: 12,
+                                    }}
+                                  />
+                                )}
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                        <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
+                          <button onClick={() => handleSaveEtudePerso(client.id)} style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 17, cursor: 'pointer', boxShadow: '0 2px 8px #10b98122' }}>Enregistrer</button>
+                          <button onClick={() => setShowEtudePersoId(null)} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 17, cursor: 'pointer', boxShadow: '0 2px 8px #ef444422' }}>Annuler</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 )}
-                {el.type === 'text' && (
-                  <input
-                    type="text"
-                    value={etudePerso[el.key]}
-                    onClick={e => e.stopPropagation()}
-                    onChange={e => handleChangeEtudePerso(el.key, e.target.value)}
-                    style={{
-                      width: 160,
-                      borderRadius: 6,
-                      border: '1px solid #d1d5db',
-                      padding: 6,
-                      marginLeft: 12,
-                    }}
-                  />
+                {/* MODAL DEBRIEF RDV */}
+                {showDebriefId === client.id && (
+                  <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(30,41,59,0.65)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <div style={{ background: '#fff', borderRadius: 18, padding: 0, minWidth: 420, maxWidth: 600, boxShadow: '0 8px 32px #6366f155', position: 'relative', overflow: 'hidden' }}>
+                      <div style={{ background: 'linear-gradient(90deg,#6366f1 60%,#2563eb 100%)', color: '#fff', padding: '28px 36px 18px 36px', display: 'flex', alignItems: 'center', gap: 18 }}>
+                        <div style={{ width: 54, height: 54, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px #6366f122', marginRight: 10 }}>
+                          <span style={{ fontSize: 32, color: '#6366f1' }}>📝</span>
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: 22 }}>Débrief RDV</div>
+                          <div style={{ fontSize: 15, opacity: 0.85 }}>Renseigne le ressenti et les points du rendez-vous</div>
+                        </div>
+                        <button onClick={() => setShowDebriefId(null)} style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.18)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #6366f122' }}>✕</button>
+                      </div>
+                      <form style={{ padding: '24px 36px 24px 36px' }} onSubmit={async e => {
+                        e.preventDefault();
+                        await updateDoc(doc(db, 'clients', client.id), { debrief });
+                        setShowDebriefId(null);
+                        // Optionnel: refresh clients
+                        if (user) {
+                          const q = query(collection(db, 'clients'), where('emailManager', '==', user.email));
+                          const snap = await getDocs(q);
+                          const refreshed = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                          setClients([...refreshed].reverse());
+                        }
+                      }}>
+                        <div style={{ marginBottom: 14 }}>
+                          <label style={{ fontWeight: 600 }}>Points positifs :</label><br />
+                          <textarea value={debrief.bien} onChange={e => setDebrief(prev => ({ ...prev, bien: e.target.value }))} style={{ width: '100%', minHeight: 40, borderRadius: 6, border: '1px solid #d1d5db', padding: 8, fontSize: 15 }} />
+                        </div>
+                        <div style={{ marginBottom: 14 }}>
+                          <label style={{ fontWeight: 600 }}>Points à améliorer :</label><br />
+                          <textarea value={debrief.moinsBien} onChange={e => setDebrief(prev => ({ ...prev, moinsBien: e.target.value }))} style={{ width: '100%', minHeight: 40, borderRadius: 6, border: '1px solid #d1d5db', padding: 8, fontSize: 15 }} />
+                        </div>
+                        <div style={{ marginBottom: 14 }}>
+                          <label style={{ fontWeight: 600 }}>Ressenti général :</label><br />
+                          <textarea value={debrief.ressenti} onChange={e => setDebrief(prev => ({ ...prev, ressenti: e.target.value }))} style={{ width: '100%', minHeight: 40, borderRadius: 6, border: '1px solid #d1d5db', padding: 8, fontSize: 15 }} />
+                        </div>
+                        <div style={{ marginBottom: 14 }}>
+                          <label style={{ fontWeight: 600 }}>Vente effectuée :</label><br />
+                          <select value={debrief.venteEffectuee} onChange={e => setDebrief(prev => ({ ...prev, venteEffectuee: e.target.value }))} style={{ width: '100%', borderRadius: 6, border: '1px solid #d1d5db', padding: 8, fontSize: 15 }}>
+                            <option value="">Sélectionner</option>
+                            <option value="oui">Oui</option>
+                            <option value="non">Non</option>
+                            <option value="en attente">En attente</option>
+                          </select>
+                        </div>
+                        <div style={{ display: 'flex', gap: 12, marginTop: 24, justifyContent: 'flex-end' }}>
+                          <button type="submit" style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 17, cursor: 'pointer', boxShadow: '0 2px 8px #10b98122' }}>Enregistrer</button>
+                          <button type="button" onClick={() => setShowDebriefId(null)} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 17, cursor: 'pointer', boxShadow: '0 2px 8px #ef444422' }}>Annuler</button>
+                        </div>
+                      </form>
+                    </div>
+                  </div>
                 )}
-              </button>
-            </div>
-          ))}
-        </div>
-        <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
-          <button onClick={() => handleSaveEtudePerso(client.id)} style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 17, cursor: 'pointer', boxShadow: '0 2px 8px #10b98122' }}>Enregistrer</button>
-          <button onClick={() => setShowEtudePersoId(null)} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 17, cursor: 'pointer', boxShadow: '0 2px 8px #ef444422' }}>Annuler</button>
-        </div>
-      </div>
-    </div>
-  </div>
-)}
-                </>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
     </div>
   );
+}
+
+// Ajout de la fonction d'upload
+async function handleUploadFiles(clientId, files) {
+  if (!files || files.length === 0) return;
+  const uploadedDocs = {};
+  for (const file of files) {
+    const storageRef = ref(storage, `clients/${clientId}/${file.name}`);
+    await uploadBytes(storageRef, file);
+    const url = await getDownloadURL(storageRef);
+    uploadedDocs[file.name] = url;
+  }
+  // Met à jour le client dans Firestore
+  const clientRef = doc(db, 'clients', clientId);
+  await updateDoc(clientRef, {
+    docs: uploadedDocs
+  });
+  alert('Fichiers importés et enregistrés !');
 }
