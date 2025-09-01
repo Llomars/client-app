@@ -450,17 +450,7 @@ export default function MesClients() {
     { key: 'autres', label: 'Autres (champ libre)', type: 'text', icon: '✨' }
   ];
 
-  // Affiche la page seulement si admin ou manager
-  if (userRole === 'commercial') {
-    return (
-      <div style={{ padding: 40 }}>
-        <h2>Mes clients</h2>
-        <div style={{ color: '#ef4444', fontWeight: 600, marginTop: 24 }}>
-          Accès réservé aux managers et administrateurs.
-        </div>
-      </div>
-    );
-  }
+  // Affiche la page pour tous les rôles
   return (
     <div style={{ padding: 40 }}>
       <h2>Mes clients</h2>
@@ -470,11 +460,13 @@ export default function MesClients() {
         </div>
       )}
       {/* DEBUG: Affichage commerciaux récupérés */}
-      <div style={{ marginBottom: 12, color: '#ef4444', fontSize: 14 }}>
-        <b>Commerciaux récupérés :</b> {commerciaux.map(c => `${(c.nom || '') + ' ' + (c.prenom || '')}`.trim() ? `${c.nom || ''} ${c.prenom || ''} (${c.email})` : c.email).join(', ')}
-      </div>
+      {userRole !== 'commercial' && (
+        <div style={{ marginBottom: 12, color: '#ef4444', fontSize: 14 }}>
+          <b>Commerciaux récupérés :</b> {commerciaux.map(c => `${(c.nom || '') + ' ' + (c.prenom || '')}`.trim() ? `${c.nom || ''} ${c.prenom || ''} (${c.email})` : c.email).join(', ')}
+        </div>
+      )}
       {/* Barre de sélection des commerciaux pour managers/admins */}
-      {(commerciaux.length > 0 || user) && (
+      {userRole !== 'commercial' && (commerciaux.length > 0 || user) && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
           {/* Bouton pour le manager/admin lui-même */}
           {user && (
@@ -668,18 +660,26 @@ export default function MesClients() {
         </div>
         <button type="button" onClick={handleEnregistrerRapide} style={{ padding: '8px 18px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 16, cursor: 'pointer', marginTop: 8 }}>Enregistrer infos rapide</button>
       </form>
-      {/* Liste des clients filtrée par commercial sélectionné */}
+      {/* Liste des clients filtrée */}
       <ul style={{ listStyle: 'none', padding: 0 }}>
-        {clients.filter(c => activeTab ? c.emailManager === activeTab : true).length === 0 && (
+        {(
+          userRole === 'commercial'
+            ? clients.filter(c => c.emailCommercial === user.email)
+            : clients.filter(c => activeTab ? c.emailManager === activeTab : true)
+        ).length === 0 && (
           <li style={{ color: '#ef4444', fontWeight: 600 }}>
             Aucun client attribué.<br />
             <span style={{ fontWeight: 400, color: '#64748b' }}>
-              Vérifie que tes clients dans Firestore ont bien le champ <b>emailManager</b> égal à <b>{activeTab || (user ? user.email : '')}</b>.<br />
+              Vérifie que tes clients dans Firestore ont bien le champ <b>{userRole === 'commercial' ? 'emailCommercial' : 'emailManager'}</b> égal à <b>{user.email}</b>.<br />
               (Sinon, ajoute un client avec le formulaire ci-dessus pour tester)
             </span>
           </li>
         )}
-        {clients.filter(c => activeTab ? c.emailManager === activeTab : true).map((client) => {
+        {(
+          userRole === 'commercial'
+            ? clients.filter(c => c.emailCommercial === user.email)
+            : clients.filter(c => activeTab ? c.emailManager === activeTab : true)
+        ).map((client) => {
           // Récupération de l'état projet pour ce client
           const etat = etatProjet[client.id] || {};
           const etatsOrder = [
