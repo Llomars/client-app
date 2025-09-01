@@ -323,22 +323,32 @@ export default function MesClients() {
   // --- AJOUT ÉTUDE PERSO ---
   const [showEtudePersoId, setShowEtudePersoId] = useState(null);
   const [etudePerso, setEtudePerso] = useState(null);
-  const etudePersoElements = [
-    { key: 'four', label: 'Four', type: 'bool' },
-    { key: 'tele', label: 'Télé', type: 'bool' },
-    { key: 'plaque', label: 'Plaque électrique', type: 'bool' },
-    { key: 'frigo', label: 'Frigo', type: 'number' },
-    { key: 'congelateur', label: 'Congélateur', type: 'bool' },
-    { key: 'clims', label: 'Clims', type: 'number' },
-    { key: 'piscine', label: 'Piscine', type: 'bool' },
-    { key: 'pompeChaleur', label: 'Pompe à chaleur', type: 'bool' },
-    { key: 'jacuzzi', label: 'Jacuzzi', type: 'bool' },
-    { key: 'voitureElec', label: 'Voiture électrique', type: 'bool' },
-    { key: 'caveVin', label: 'Cave à vin', type: 'bool' },
-    { key: 'consolesPc', label: 'Consoles ou PC', type: 'bool' },
-    { key: 'brasseurAir', label: "Brasseur d'air", type: 'bool' },
-    { key: 'autres', label: 'Autres (champ libre)', type: 'text' },
+  // Ajout profil client
+  const profilOptions = [
+    { key: 'economie', label: 'Économie' },
+    { key: 'autonomie', label: 'Autonomie' },
+    { key: 'ecologie', label: 'Écologie' },
+    { key: 'revente', label: 'Revente de surplus' },
+    { key: 'plusValue', label: 'Plus-value immobilière' },
+    { key: 'primeEDF', label: 'Prime EDF' }
   ];
+  const handleToggleProfil = (key) => {
+    setEtudePerso(prev => {
+      const selected = prev.profilClient || [];
+      if (selected.includes(key)) {
+        // Retire la case
+        return { ...prev, profilClient: selected.filter(k => k !== key) };
+      } else {
+        // Ajoute si moins de 3
+        if (selected.length < 3) {
+          return { ...prev, profilClient: [...selected, key] };
+        } else {
+          return prev;
+        }
+      }
+    });
+  };
+
   const handleOpenEtudePerso = (client) => {
     setShowEtudePersoId(client.id);
     if (client.etudePerso) {
@@ -359,6 +369,7 @@ export default function MesClients() {
         consolesPc: false,
         brasseurAir: false,
         autres: '',
+        profilClient: []
       });
     }
   };
@@ -420,6 +431,24 @@ export default function MesClients() {
       setClients([...refreshed].reverse());
     }
   };
+
+  // Éléments de consommation pour étude perso
+  const etudePersoElements = [
+    { key: 'four', label: 'Four', type: 'bool', icon: '🍞' },
+    { key: 'tele', label: 'Télé', type: 'bool', icon: '📺' },
+    { key: 'plaque', label: 'Plaque électrique', type: 'bool', icon: '🍳' },
+    { key: 'frigo', label: 'Frigo', type: 'number', icon: '🧊' },
+    { key: 'congelateur', label: 'Congélateur', type: 'bool', icon: '❄️' },
+    { key: 'clims', label: 'Clims', type: 'number', icon: '🌬️' },
+    { key: 'piscine', label: 'Piscine', type: 'bool', icon: '🏊' },
+    { key: 'pompeChaleur', label: 'Pompe à chaleur', type: 'bool', icon: '🔥' },
+    { key: 'jacuzzi', label: 'Jacuzzi', type: 'bool', icon: '🛁' },
+    { key: 'voitureElec', label: 'Voiture électrique', type: 'bool', icon: '🚗' },
+    { key: 'caveVin', label: 'Cave à vin', type: 'bool', icon: '🍷' },
+    { key: 'consolesPc', label: 'Consoles ou PC', type: 'bool', icon: '🎮' },
+    { key: 'brasseurAir', label: "Brasseur d'air", type: 'bool', icon: '🌀' },
+    { key: 'autres', label: 'Autres (champ libre)', type: 'text', icon: '✨' }
+  ];
 
   // Affiche la page seulement si admin ou manager
   if (userRole === 'commercial') {
@@ -830,88 +859,134 @@ export default function MesClients() {
                     </div>
                   )}
                   {/* MODAL ÉTUDE PERSO */}
-                  {showEtudePersoId === client.id && (
-                    <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(30,41,59,0.65)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <div style={{ background: '#fff', borderRadius: 18, padding: 0, minWidth: 420, maxWidth: 600, boxShadow: '0 8px 32px #2563eb55', position: 'relative', overflow: 'hidden' }}>
-                        <div style={{ background: 'linear-gradient(90deg,#2563eb 60%,#6366f1 100%)', color: '#fff', padding: '28px 36px 18px 36px', display: 'flex', alignItems: 'center', gap: 18 }}>
-                          <div style={{ width: 54, height: 54, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px #2563eb22', marginRight: 10 }}>
-                            <span style={{ fontSize: 32, color: '#2563eb' }}>⚡</span>
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 700, fontSize: 22 }}>Étude perso - équipements du foyer</div>
-                            <div style={{ fontSize: 15, opacity: 0.85 }}>Sélectionne les équipements présents chez le client</div>
-                          </div>
-                          <button onClick={() => setShowEtudePersoId(null)} style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.18)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #2563eb22' }}>✕</button>
-                        </div>
-                        <div style={{ padding: '24px 36px 0 36px' }}>
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14 }}>
-                            {etudePersoElements.map(el => (
-                              <div key={el.key} style={{ marginBottom: 8 }}>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    if (el.type === 'bool') handleChangeEtudePerso(el.key, !etudePerso[el.key]);
-                                  }}
-                                  style={{
-                                    minWidth: 180,
-                                    minHeight: 48,
-                                    background: el.type === 'bool' && etudePerso[el.key] ? '#2563eb' : '#f1f5f9',
-                                    color: el.type === 'bool' && etudePerso[el.key] ? '#fff' : '#334155',
-                                    border: '2px solid ' + (el.type === 'bool' && etudePerso[el.key] ? '#2563eb' : '#d1d5db'),
-                                    borderRadius: 10,
-                                    fontWeight: 600,
-                                    fontSize: 16,
-                                    cursor: el.type === 'bool' ? 'pointer' : 'default',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    position: 'relative',
-                                    marginBottom: 2,
-                                    boxShadow: el.type === 'bool' && etudePerso[el.key] ? '0 2px 8px #2563eb22' : 'none',
-                                    transition: 'all 0.15s',
-                                  }}
-                                >
-                                  <span style={{ flex: 1 }}>{el.label}</span>
-                                  {el.type === 'number' && (
-                                    <input
-                                      type="number"
-                                      min={0}
-                                      value={etudePerso[el.key]}
-                                      onClick={e => e.stopPropagation()}
-                                      onChange={e => handleChangeEtudePerso(el.key, Number(e.target.value))}
-                                      style={{
-                                        width: 60,
-                                        borderRadius: 6,
-                                        border: '1px solid #d1d5db',
-                                        padding: 6,
-                                        marginLeft: 12,
-                                      }}
-                                    />
-                                  )}
-                                  {el.type === 'text' && (
-                                    <input
-                                      type="text"
-                                      value={etudePerso[el.key]}
-                                      onClick={e => e.stopPropagation()}
-                                      onChange={e => handleChangeEtudePerso(el.key, e.target.value)}
-                                      style={{
-                                        width: 160,
-                                        borderRadius: 6,
-                                        border: '1px solid #d1d5db',
-                                        padding: 6,
-                                        marginLeft: 12,
-                                      }}
-                                    />
-                                  )}
-                                </button>
+                  {showEtudePersoId && (
+                    <div style={{
+                      position: 'fixed',
+                      top: 0,
+                      left: 0,
+                      width: '100vw',
+                      height: '100vh',
+                      background: 'rgba(0,0,0,0.18)',
+                      zIndex: 9999,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                    }}>
+                      <div style={{
+                        background: '#fff',
+                        borderRadius: 16,
+                        boxShadow: '0 4px 32px #2563eb33',
+                        width: '100%',
+                        maxWidth: 480,
+                        maxHeight: '80vh',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        position: 'relative',
+                        overflow: 'hidden',
+                      }}>
+                        <div style={{
+                          padding: '32px 24px 90px 24px',
+                          overflowY: 'auto',
+                          flex: 1,
+                          minHeight: 0,
+                          maxHeight: 'calc(80vh - 90px)',
+                        }}>
+                          <h3 style={{ marginBottom: 12, color: '#2563eb', fontWeight: 700 }}>Éléments de consommation</h3>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
+                            {etudePersoElements.filter(el => el.type === 'bool').map(el => (
+                              <button
+                                key={el.key}
+                                type="button"
+                                onClick={() => handleChangeEtudePerso(el.key, !etudePerso?.[el.key])}
+                                style={{
+                                  minWidth: 120,
+                                  padding: '14px 18px',
+                                  borderRadius: 10,
+                                  border: etudePerso?.[el.key] ? '2px solid #2563eb' : '1px solid #d1d5db',
+                                  background: etudePerso?.[el.key] ? '#dbeafe' : '#fff',
+                                  color: etudePerso?.[el.key] ? '#2563eb' : '#334155',
+                                  fontWeight: 600,
+                                  fontSize: 15,
+                                  cursor: 'pointer',
+                                  boxShadow: etudePerso?.[el.key] ? '0 2px 8px #2563eb22' : 'none',
+                                  marginBottom: 6,
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 8
+                                }}
+                              >
+                                <span style={{ fontSize: 22 }}>{el.icon}</span>
+                                {el.label}
+                              </button>
+                            ))}
+                            <div style={{ display: 'flex', gap: 12, marginTop: 18 }}>
+                              {/* Frigo */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 22 }}>{etudePersoElements.find(e => e.key === 'frigo')?.icon}</span>
+                                <label style={{ fontWeight: 600 }}>Frigo :</label>
+                                <input type="number" min={0} value={etudePerso?.frigo || 0} onChange={e => handleChangeEtudePerso('frigo', Number(e.target.value))} style={{ width: 60, padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} />
                               </div>
+                              {/* Congélateur */}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ fontSize: 22 }}>{etudePersoElements.find(e => e.key === 'congelateur')?.icon}</span>
+                                <label style={{ fontWeight: 600 }}>Congélateur :</label>
+                                <input type="number" min={0} value={etudePerso?.congelateur || 0} onChange={e => handleChangeEtudePerso('congelateur', Number(e.target.value))} style={{ width: 60, padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} />
+                              </div>
+                            </div>
+                            {/* Champ Autre */}
+                            <div style={{ marginTop: 18 }}>
+                              <label style={{ fontWeight: 600 }}>Autre élément :</label>
+                              <input type="text" value={etudePerso?.autres || ''} onChange={e => handleChangeEtudePerso('autres', e.target.value)} placeholder="Saisir un autre équipement..." style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} />
+                            </div>
+                          </div>
+                          <h4 style={{ marginBottom: 10, marginTop: 18, color: '#334155', fontWeight: 600 }}>Profil du client (max 3)</h4>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginBottom: 18 }}>
+                            {profilOptions.map(opt => (
+                              <button
+                                key={opt.key}
+                                type="button"
+                                onClick={() => handleToggleProfil(opt.key)}
+                                disabled={
+                                  !etudePerso?.profilClient?.includes(opt.key) && (etudePerso?.profilClient?.length || 0) >= 3
+                                }
+                                style={{
+                                  minWidth: 120,
+                                  padding: '14px 18px',
+                                  borderRadius: 10,
+                                  border: etudePerso?.profilClient?.includes(opt.key) ? '2px solid #2563eb' : '1px solid #d1d5db',
+                                  background: etudePerso?.profilClient?.includes(opt.key) ? '#dbeafe' : '#fff',
+                                  color: etudePerso?.profilClient?.includes(opt.key) ? '#2563eb' : '#334155',
+                                  fontWeight: 600,
+                                  fontSize: 15,
+                                  cursor: 'pointer',
+                                  boxShadow: etudePerso?.profilClient?.includes(opt.key) ? '0 2px 8px #2563eb22' : 'none',
+                                  opacity: (!etudePerso?.profilClient?.includes(opt.key) && (etudePerso?.profilClient?.length || 0) >= 3) ? 0.6 : 1,
+                                  marginBottom: 6
+                                }}
+                              >
+                                {opt.label}
+                              </button>
                             ))}
                           </div>
-                          <div style={{ display: 'flex', gap: 12, marginTop: 24 }}>
-                            <button onClick={() => handleSaveEtudePerso(client.id)} style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 17, cursor: 'pointer', boxShadow: '0 2px 8px #10b98122' }}>Enregistrer</button>
-                            <button onClick={() => setShowEtudePersoId(null)} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 17, cursor: 'pointer', boxShadow: '0 2px 8px #ef444422' }}>Annuler</button>
-                          </div>
                         </div>
+                        <div style={{
+                          position: 'absolute',
+                          left: 0,
+                          bottom: 0,
+                          width: '100%',
+                          background: '#fff',
+                          borderTop: '1px solid #e5e7eb',
+                          padding: '18px 24px',
+                          display: 'flex',
+                          gap: 12,
+                          justifyContent: 'flex-end',
+                          zIndex: 2,
+                        }}>
+                          <button onClick={() => handleSaveEtudePerso(showEtudePersoId)} style={{ padding: '8px 18px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>Enregistrer</button>
+                          <button onClick={() => setShowEtudePersoId(null)} style={{ padding: '8px 18px', background: '#e5e7eb', color: '#334155', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>Annuler</button>
+                        </div>
+                        <button onClick={() => setShowEtudePersoId(null)} style={{ position: 'absolute', top: 18, right: 18, background: 'none', border: 'none', fontSize: 22, color: '#64748b', cursor: 'pointer', zIndex: 3 }} title="Fermer">×</button>
                       </div>
                     </div>
                   )}
@@ -1015,6 +1090,17 @@ export default function MesClients() {
                           ) : (
                             <div style={{ color: '#64748b' }}>Aucune étude perso renseignée.</div>
                           )}
+                                                   <hr style={{ margin: '18px 0' }} />
+                          <h4 style={{ marginBottom: 10, color: '#2563eb' }}>Profil du client (étude perso)</h4>
+                          {client.etudePerso && Array.isArray(client.etudePerso.profilClient) && client.etudePerso.profilClient.length > 0 ? (
+                            <ul style={{ paddingLeft: 18 }}>
+                              {client.etudePerso.profilClient.map((key) => (
+                                <li key={key}>{profilOptions.find(opt => opt.key === key)?.label || key}</li>
+                              ))}
+                            </ul>
+                          ) : (
+                            <div style={{ color: '#64748b' }}>Aucun profil renseigné.</div>
+                          )}
                           <hr style={{ margin: '18px 0' }} />
                           <h4 style={{ marginBottom: 10, color: '#2563eb' }}>Étude calculateur</h4>
                           {Array.isArray(client.Etude) && client.Etude.length > 0 ? (
@@ -1053,7 +1139,7 @@ export default function MesClients() {
                           )}
                           <div style={{ textAlign: 'right', marginTop: 18 }}>
                             <button onClick={() => setShowFicheClientId(null)} style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #ef444422' }}>Fermer</button>
-                                                   </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1070,7 +1156,7 @@ export default function MesClients() {
                             <div style={{ fontWeight: 700, fontSize: 22 }}>Etat du projet</div>
                             <div style={{ fontSize: 15, opacity: 0.85 }}>Coche les étapes validées du projet</div>
                           </div>
-                          <button onClick={() => setShowEtatProjetId(null)} style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.18)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px  16px', fontWeight: 600, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #4ade8022' }}>✕</button>
+                          <button onClick={() => setShowEtatProjetId(null)} style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.18)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #4ade8022' }}>✕</button>
                         </div>
                         <div style={{ padding: '24px 36px 24px 36px' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
