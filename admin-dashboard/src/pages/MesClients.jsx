@@ -121,18 +121,21 @@ export default function MesClients() {
   useEffect(() => {
     if (!user) return;
     const fetchClientsAndCommerciaux = async () => {
-      // setLoading(true);
       // Récupère tous les commerciaux attribués au manager
       const commerciauxSnap = await getDocs(query(collection(db, 'users'), where('managerEmail', '==', user.email)));
       const commerciauxList = commerciauxSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setCommerciaux(commerciauxList);
-      // Récupère tous les clients attribués au manager
-      const clientsSnap = await getDocs(query(collection(db, 'clients'), where('emailManager', '==', user.email)));
+      // Récupère tous les clients selon le rôle
+      let clientsSnap;
+      if (userRole === 'commercial') {
+        clientsSnap = await getDocs(query(collection(db, 'clients'), where('emailCommercial', '==', user.email)));
+      } else {
+        clientsSnap = await getDocs(query(collection(db, 'clients'), where('emailManager', '==', user.email)));
+      }
       let clientList = clientsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       // Ajoute un faux client pour chaque commercial attribué au manager (démo locale)
-      if (commerciauxList.length > 0) {
+      if (commerciauxList.length > 0 && userRole !== 'commercial') {
         commerciauxList.forEach((comm, idx) => {
-          // Vérifie si le commercial a déjà un client
           const hasClient = clientList.some(c => c.emailManager === comm.email);
           if (!hasClient) {
             clientList.push({
@@ -157,14 +160,11 @@ export default function MesClients() {
           }
         });
       }
-      // Trie pour afficher le dernier ajouté en haut
       setClients([...clientList].reverse());
-      // Onglet actif par défaut = premier commercial
-      if (commerciauxList.length > 0 && !activeTab) setActiveTab(commerciauxList[0].email);
+      if (commerciauxList.length > 0 && !activeTab && userRole !== 'commercial') setActiveTab(commerciauxList[0].email);
       // Récupère tous les managers et admins pour la sélection du manager
       const managersSnap = await getDocs(query(collection(db, 'users'), where('role', 'in', ['manager', 'admin'])));
       let managersList = managersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Ajoute TOUJOURS l'utilisateur connecté en tête de liste, sans doublon
       if (user) {
         managersList = [
           { email: user.email, nom: user.displayName || '', prenom: '', id: 'me' },
@@ -178,7 +178,6 @@ export default function MesClients() {
         if (c.etatProjet) etatProjetInit[c.id] = c.etatProjet;
       });
       setEtatProjet(etatProjetInit);
-      // setLoading(false);
     };
     fetchClientsAndCommerciaux();
   }, [user, userRole, activeTab]);
@@ -266,9 +265,24 @@ export default function MesClients() {
   const handleAjoutClient = async (e) => {
     e.preventDefault();
     if (nouveauClient.nom && nouveauClient.prenom && nouveauClient.adresse && nouveauClient.ville && nouveauClient.email && nouveauClient.telephone && user) {
+      let emailManagerToUse = user.email;
+      let debugManagerEmail = '';
+      if (userRole === 'commercial') {
+        // Cherche le manager du commercial dans la collection users
+        const userSnap = await getDocs(query(collection(db, 'users'), where('email', '==', user.email)));
+        let managerEmail = user.email;
+        if (!userSnap.empty) {
+          const userData = userSnap.docs[0].data();
+          if (userData.managerEmail) managerEmail = userData.managerEmail;
+          debugManagerEmail = userData.managerEmail || '';
+        }
+        emailManagerToUse = managerEmail;
+      }
+      // DEBUG: Affiche la valeur récupérée pour managerEmail
+      console.log('DEBUG managerEmail utilisé pour le client:', emailManagerToUse, 'managerEmail Firestore:', debugManagerEmail);
       await addDoc(collection(db, 'clients'), {
         ...nouveauClient,
-        emailManager: user.email,
+        emailManager: emailManagerToUse,
         emailCommercial: user.email, // accès commercial
       });
       setNouveauClient({
@@ -284,7 +298,12 @@ export default function MesClients() {
         professionMR: '',
         professionMME: '',
       });
-      const q = query(collection(db, 'clients'), where('emailManager', '==', user.email));
+      let q;
+      if (userRole === 'commercial') {
+        q = query(collection(db, 'clients'), where('emailCommercial', '==', user.email));
+      } else {
+        q = query(collection(db, 'clients'), where('emailManager', '==', user.email));
+      }
       const snap = await getDocs(q);
       const refreshed = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setClients([...refreshed].reverse());
@@ -380,7 +399,12 @@ export default function MesClients() {
     await updateDoc(doc(db, 'clients', clientId), { etudePerso });
     setShowEtudePersoId(null);
     if (user) {
-      const q = query(collection(db, 'clients'), where('emailManager', '==', user.email));
+      let q;
+      if (userRole === 'commercial') {
+        q = query(collection(db, 'clients'), where('emailCommercial', '==', user.email));
+      } else {
+        q = query(collection(db, 'clients'), where('emailManager', '==', user.email));
+      }
       const snap = await getDocs(q);
       const refreshed = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setClients([...refreshed].reverse());
@@ -394,16 +418,24 @@ export default function MesClients() {
   // Handler pour ouvrir la modal Etat projet
   const handleOpenEtatProjet = (clientId) => {
     setShowEtatProjetId(clientId);
+    const client = clients.find(c => c.id === clientId);
+    const firestoreEtat = client?.etatProjet || {};
+    // Normalise toutes les valeurs (boolean ou string)
+    const normalizedEtat = Object.keys(firestoreEtat).length > 0
+      ? Object.fromEntries(
+          Object.entries(firestoreEtat).map(([k, v]) => [k, v === true || v === 'true' || v === 1 || v === '1'])
+        )
+      : {
+          rdvFait: false,
+          attente: false,
+          vendu: false,
+          declarationEnCours: false,
+          declarationValidee: false,
+          installe: false
+        };
     setEtatProjet(prev => ({
       ...prev,
-      [clientId]: prev[clientId] || {
-        rdvFait: false,
-        attente: false,
-        vendu: false,
-        declarationEnCours: false,
-        declarationValidee: false,
-        installe: false
-      }
+      [clientId]: normalizedEtat
     }));
   };
 
@@ -420,12 +452,22 @@ export default function MesClients() {
 
   // Handler pour sauvegarder l'état projet (à adapter si tu veux persister dans Firestore)
   const handleSaveEtatProjet = async (clientId) => {
-    // Sauvegarde dans Firestore
+    // Met à jour etatProjet
     await updateDoc(doc(db, 'clients', clientId), { etatProjet: etatProjet[clientId] });
+    // Si "vendu" est coché, met le statut principal à "Vendu". Si décoché, remet à "En cours".
+    if (etatProjet[clientId]?.vendu) {
+      await updateDoc(doc(db, 'clients', clientId), { statut: 'Vendu' });
+    } else {
+      await updateDoc(doc(db, 'clients', clientId), { statut: 'En cours' });
+    }
     setShowEtatProjetId(null);
-    // Optionnel : refresh clients pour afficher l'état à jour
     if (user) {
-      const q = query(collection(db, 'clients'), where('emailManager', '==', user.email));
+      let q;
+      if (userRole === 'commercial') {
+        q = query(collection(db, 'clients'), where('emailCommercial', '==', user.email));
+      } else {
+        q = query(collection(db, 'clients'), where('emailManager', '==', user.email));
+      }
       const snap = await getDocs(q);
       const refreshed = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setClients([...refreshed].reverse());
@@ -451,18 +493,23 @@ export default function MesClients() {
   ];
 
   // Affiche la page pour tous les rôles
+  if (!user) {
+    return (
+      <div style={{ padding: 40 }}>
+        <h2>Mes clients</h2>
+        <div style={{ color: '#64748b', fontSize: 16, marginTop: 32 }}>
+          Connexion en cours... Veuillez patienter.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={{ padding: 40 }}>
       <h2>Mes clients</h2>
       {user && (
         <div style={{ marginBottom: 12, color: '#64748b', fontSize: 15 }}>
           <b>Utilisateur connecté :</b> {user.email}
-        </div>
-      )}
-      {/* DEBUG: Affichage commerciaux récupérés */}
-      {userRole !== 'commercial' && (
-        <div style={{ marginBottom: 12, color: '#ef4444', fontSize: 14 }}>
-          <b>Commerciaux récupérés :</b> {commerciaux.map(c => `${(c.nom || '') + ' ' + (c.prenom || '')}`.trim() ? `${c.nom || ''} ${c.prenom || ''} (${c.email})` : c.email).join(', ')}
         </div>
       )}
       {/* Barre de sélection des commerciaux pour managers/admins */}
@@ -1090,7 +1137,7 @@ export default function MesClients() {
                           ) : (
                             <div style={{ color: '#64748b' }}>Aucune étude perso renseignée.</div>
                           )}
-                                                   <hr style={{ margin: '18px 0' }} />
+                          <hr style={{ margin: '18px 0' }} />
                           <h4 style={{ marginBottom: 10, color: '#2563eb' }}>Profil du client (étude perso)</h4>
                           {client.etudePerso && Array.isArray(client.etudePerso.profilClient) && client.etudePerso.profilClient.length > 0 ? (
                             <ul style={{ paddingLeft: 18 }}>
@@ -1146,45 +1193,25 @@ export default function MesClients() {
                   )}
                   {/* MODAL ÉTAT PROJET */}
                   {showEtatProjetId && (
-                    <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(30,41,59,0.65)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <div style={{ background: '#fff', borderRadius: 18, padding: 0, minWidth: 420, maxWidth: 600, boxShadow: '0 8px 32px #4ade8055', position: 'relative', overflow: 'hidden' }}>
-                        <div style={{ background: 'linear-gradient(90deg,#4ade80 60%,#2563eb 100%)', color: '#fff', padding: '28px 36px 18px 36px', display: 'flex', alignItems: 'center', gap: 18 }}>
-                          <div style={{ width: 54, height: 54, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 2px 8px #4ade8022', marginRight: 10 }}>
-                            <span style={{ fontSize: 32, color: '#4ade80' }}>📊</span>
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 700, fontSize: 22 }}>Etat du projet</div>
-                            <div style={{ fontSize: 15, opacity: 0.85 }}>Coche les étapes validées du projet</div>
-                          </div>
-                          <button onClick={() => setShowEtatProjetId(null)} style={{ marginLeft: 'auto', background: 'rgba(255,255,255,0.18)', color: '#fff', border: 'none', borderRadius: 8, padding: '8px 16px', fontWeight: 600, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #4ade8022' }}>✕</button>
-                        </div>
-                        <div style={{ padding: '24px 36px 24px 36px' }}>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem', color: '#34495e' }}>
-                              <input type="checkbox" checked={etatProjet.rdvFait} onChange={e => handleChangeEtatProjet('rdvFait', e.target.checked)} /> RDV fait
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem', color: '#34495e' }}>
-                              <input type="checkbox" checked={etatProjet.attente} onChange={e => handleChangeEtatProjet('attente', e.target.checked)} /> En attente
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem', color: '#34495e' }}>
-                              <input type="checkbox" checked={etatProjet.vendu} onChange={e => handleChangeEtatProjet('vendu', e.target.checked)} /> Vendu
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem', color: '#34495e' }}>
-                              <input type="checkbox" checked={etatProjet.declarationEnCours} onChange={e => handleChangeEtatProjet('declarationEnCours', e.target.checked)} /> Déclaration en cours
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem', color: '#34495e' }}>
-                              <input type="checkbox" checked={etatProjet.declarationValidee} onChange={e => handleChangeEtatProjet('declarationValidee', e.target.checked)} /> Déclaration validée
-                            </label>
-                            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1rem', color: '#34495e' }}>
-                              <input type="checkbox" checked={etatProjet.installe} onChange={e => handleChangeEtatProjet('installe', e.target.checked)} /> Installé
-                            </label>
-                          </div>
-                          <div style={{ textAlign: 'right', marginTop: 24 }}>
-                            <button style={{ background: '#27ae60', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #27ae6022', marginRight: 10 }} onClick={() => handleSaveEtatProjet(showEtatProjetId)}>Sauvegarder</button>
-                            <button style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 22px', fontWeight: 700, fontSize: 16, cursor: 'pointer', boxShadow: '0 2px 8px #ef444422' }} onClick={() => setShowEtatProjetId(null)}>Fermer</button>
-                          </div>
-                        </div>
-                      </div>
+                    <div className="modal-etat-projet">
+                      <h3>État du projet</h3>
+                      {['rdvFait','attente','vendu','declarationEnCours','declarationValidee','installe'].map(key => (
+                        <label key={key} style={{ display: 'block', marginBottom: 8 }}>
+                          <input
+                            type="checkbox"
+                            checked={!!(etatProjet[showEtatProjetId] && etatProjet[showEtatProjetId][key])}
+                            onChange={e => handleChangeEtatProjet(key, e.target.checked)}
+                          />
+                          {key === 'rdvFait' ? 'RDV fait' :
+                           key === 'attente' ? 'En attente' :
+                           key === 'vendu' ? 'Vendu' :
+                           key === 'declarationEnCours' ? 'Déclaration en cours' :
+                           key === 'declarationValidee' ? 'Déclaration validée' :
+                           key === 'installe' ? 'Installé' : key}
+                        </label>
+                      ))}
+                      <button onClick={() => handleSaveEtatProjet(showEtatProjetId)} style={{ marginTop: 12, padding: '8px 18px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>Enregistrer</button>
+                      <button onClick={() => setShowEtatProjetId(null)} style={{ marginLeft: 8, padding: '8px 18px', background: '#e5e7eb', color: '#334155', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>Annuler</button>
                     </div>
                   )}
                 </>

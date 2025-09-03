@@ -16,22 +16,15 @@ export default function CommercialDashboard() {
   const [commerciaux, setCommerciaux] = React.useState([]);
 
   // Exemple de stats (à remplacer par tes vraies données)
-  const caMois = 24500;
-  const ventesMois = 12;
+  const caMois = null;
+  const ventesMois = null;
   const salaireFixe = 1500;
   const commission = 0.05; // 5%
-  const totalCommission = caMois * commission;
+  const totalCommission = caMois ? caMois * commission : 0;
   const salaireTotal = salaireFixe + totalCommission;
 
   // Données pour le graphique (exemple)
-  const months = [
-    { label: 'Jan', CA: 18000, ventes: 8 },
-    { label: 'Fév', CA: 22000, ventes: 10 },
-    { label: 'Mar', CA: 24500, ventes: 12 },
-    { label: 'Avr', CA: 21000, ventes: 9 },
-    { label: 'Mai', CA: 23000, ventes: 11 },
-    { label: 'Juin', CA: 20000, ventes: 8 },
-  ];
+  const months = [];
 
   // Récupération des données Firestore pour clients et commerciaux
   React.useEffect(() => {
@@ -114,11 +107,11 @@ export default function CommercialDashboard() {
             {/* ...cartes stats... */}
             <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderLeft: '6px solid #3b82f6' }}>
               <div style={{ color: '#6b7280', fontSize: 14 }}>CA total du mois</div>
-              <div style={{ color: '#3b82f6', fontSize: 28, fontWeight: 700 }}>{caMois.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</div>
+              <div style={{ color: '#3b82f6', fontSize: 28, fontWeight: 700 }}>{caMois !== null ? caMois.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' }) : 'Données indisponibles'}</div>
             </div>
             <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderLeft: '6px solid #10b981' }}>
               <div style={{ color: '#6b7280', fontSize: 14 }}>Ventes du mois</div>
-              <div style={{ color: '#10b981', fontSize: 28, fontWeight: 700 }}>{ventesMois}</div>
+              <div style={{ color: '#10b981', fontSize: 28, fontWeight: 700 }}>{ventesMois !== null ? ventesMois : 'Données indisponibles'}</div>
             </div>
             <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderLeft: '6px solid #6366f1' }}>
               <div style={{ color: '#6b7280', fontSize: 14 }}>Salaire total</div>
@@ -523,17 +516,11 @@ function EquipeStatsSection() {
     getDocs(collection(db, 'clients')).then(snap => {
       const allClients = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setClients(allClients);
-      // On ne retient comme managers que les emails des users ayant le rôle 'manager' ou 'admin'
-      getDocs(collection(db, 'users')).then(userSnap => {
-        const users = userSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        setCommerciaux(users);
-        // Filtre les doublons d'emails manager/admin
-        const seenEmails = new Set();
-        const managerEmails = users
-          .filter(u => (u.role === 'manager' || u.role === 'admin') && u.email && !seenEmails.has(u.email) && seenEmails.add(u.email))
-          .map(u => u.email);
-        setManagers(managerEmails);
-      });
+      const managerEmails = [...new Set(allClients.map(c => c.emailManager).filter(Boolean))];
+      setManagers(managerEmails);
+    });
+    getDocs(collection(db, 'users')).then(snap => {
+      setCommerciaux(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     });
   }, []);
 
@@ -691,8 +678,6 @@ function EquipeStatsSection() {
                     <div style={{ fontWeight: 600, color: '#334155', fontSize: 15, marginBottom: 2 }}>{com.nom || com.email}</div>
                     <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>CA du mois : <b>{typeof com.caMois === 'number' ? com.caMois.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' }) : '0 €'}</b></div>
                     <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>Ventes du mois : <b>{com.ventesMois || 0}</b></div>
-                    <div style={{ fontSize: 14, color: '#2563eb', marginBottom: 2 }}>RDV pris (mois) : <b>{com.nbRdvPris || 0}</b></div>
-                    <div style={{ fontSize: 14, color: '#2563eb', marginBottom: 2 }}>RDV faits (mois) : <b>{com.nbRdvFait || 0}</b></div>
                     {/* Top professions : si dispo, sinon rien */}
                     {Array.isArray(com.topProfs) && com.topProfs.length > 0 && (
                       <div style={{ fontSize: 14, color: '#2563eb', marginBottom: 2 }}>Top 3 professions vendues :</div>
