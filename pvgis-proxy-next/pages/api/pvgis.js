@@ -61,4 +61,5 @@ export default async function handler(req, res) {
     console.error('PVGIS proxy error:', e);
     return res.status(500).json({ error: 'Proxy error', details: e.message, stack: e.stack, full: e });
   }
+  // DEBUG: Ce proxy force toujours SARAH3, modification inutile pour commit
 }
