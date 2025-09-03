@@ -24,8 +24,16 @@ export default async function handler(req, res) {
   }
   // DEBUG: log la valeur reçue
   console.log('PVGIS proxy - urlParam FINAL:', urlParam);
+  // Force raddatabase=PVGIS-SARAH3
   try {
-    const fetchRes = await fetch(urlParam, {
+    const urlObj = new URL(urlParam);
+    while (urlObj.searchParams.has('raddatabase')) {
+      urlObj.searchParams.delete('raddatabase');
+    }
+    urlObj.searchParams.append('raddatabase', 'PVGIS-SARAH3');
+    const forcedUrl = urlObj.toString();
+    console.log('PVGIS proxy - URL relayée (SARAH3 forcé):', forcedUrl);
+    const fetchRes = await fetch(forcedUrl, {
       headers: {
         'User-Agent': 'PVGIS-Proxy-Next',
         'Accept': 'application/json',
