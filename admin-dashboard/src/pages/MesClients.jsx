@@ -1,10 +1,24 @@
 import { onAuthStateChanged } from 'firebase/auth';
 import { addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
-import { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { auth, db } from '../firebaseConfig';
 
 const storage = getStorage();
+
+// --- Liste des kits (centrales) ---
+const kits = [
+  { label: '3 KWh 0', value: '3KWh-0', prix: 7500 },
+  { label: '3 KWh 1', value: '3KWh-1', prix: 9500 },
+  { label: '6 KWh 0', value: '6KWh-0', prix: 12000 },
+  { label: '6 KWh 1', value: '6KWh-1', prix: 15000 },
+  { label: '6 KWh 2', value: '6KWh-2', prix: 16000 },
+  { label: '9 KWh 0', value: '9KWh-0', prix: 16500 },
+  { label: '9 KWh 1', value: '9KWh-1', prix: 22000 },
+  { label: '9 KWh 2', value: '9KWh-2', prix: 24000 },
+  { label: '12 KWh 0', value: '12KWh-0', prix: 22000 },
+  { label: '12 KWh 2', value: '12KWh-2', prix: 30000 },
+];
 
 export default function MesClients() {
   // Ajout état pour la liste des managers/admins
@@ -429,6 +443,7 @@ export default function MesClients() {
           rdvFait: false,
           attente: false,
           vendu: false,
+          nonVendu: false,
           declarationEnCours: false,
           declarationValidee: false,
           installe: false
@@ -454,11 +469,19 @@ export default function MesClients() {
   const handleSaveEtatProjet = async (clientId) => {
     // Met à jour etatProjet
     await updateDoc(doc(db, 'clients', clientId), { etatProjet: etatProjet[clientId] });
-    // Si "vendu" est coché, met le statut principal à "Vendu". Si décoché, remet à "En cours".
+    // Si "vendu" est coché, met le statut principal à "Vendu" et ajoute la date de vente UNIQUEMENT si elle n'existe pas déjà
+    const client = clients.find(c => c.id === clientId);
     if (etatProjet[clientId]?.vendu) {
-      await updateDoc(doc(db, 'clients', clientId), { statut: 'Vendu' });
+      const dateVente = client?.dateVente || new Date().toISOString();
+      await updateDoc(doc(db, 'clients', clientId), {
+        statut: 'Vendu',
+        dateVente
+      });
     } else {
-      await updateDoc(doc(db, 'clients', clientId), { statut: 'En cours' });
+      await updateDoc(doc(db, 'clients', clientId), {
+        statut: 'En cours',
+        dateVente: null
+      });
     }
     setShowEtatProjetId(null);
     if (user) {
@@ -491,6 +514,21 @@ export default function MesClients() {
     { key: 'brasseurAir', label: "Brasseur d'air", type: 'bool', icon: '🌀' },
     { key: 'autres', label: 'Autres (champ libre)', type: 'text', icon: '✨' }
   ];
+
+  // --- FILTRE ÉTAT PROJET ---
+  const etatsProjetOptions = [
+    { key: 'installe', label: 'Installé' },
+    { key: 'declarationValidee', label: 'Déclaration validée' },
+    { key: 'declarationEnCours', label: 'Déclaration en cours' },
+    { key: 'vendu', label: 'Vendu' },
+    { key: 'nonVendu', label: 'Non vendu' },
+    { key: 'attente', label: 'En attente' },
+    { key: 'rdvFait', label: 'RDV fait' }
+  ];
+  const [filtreEtatProjet, setFiltreEtatProjet] = useState([]);
+  const handleToggleFiltreEtat = (key) => {
+    setFiltreEtatProjet(prev => prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]);
+  };
 
   // Affiche la page pour tous les rôles
   if (!user) {
@@ -707,13 +745,48 @@ export default function MesClients() {
         </div>
         <button type="button" onClick={handleEnregistrerRapide} style={{ padding: '8px 18px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 16, cursor: 'pointer', marginTop: 8 }}>Enregistrer infos rapide</button>
       </form>
+      {/* Filtre par état du projet */}
+      <div style={{ marginBottom: 18, display: 'flex', gap: 12, alignItems: 'center' }}>
+        <span style={{ fontWeight: 600, color: '#2563eb' }}>Filtrer par état du projet :</span>
+        {etatsProjetOptions.map(opt => (
+          <button
+            key={opt.key}
+            type="button"
+            onClick={() => handleToggleFiltreEtat(opt.key)}
+            style={{
+              padding: '6px 14px',
+              borderRadius: 6,
+              border: filtreEtatProjet.includes(opt.key) ? '2px solid #2563eb' : '1px solid #d1d5db',
+              background: filtreEtatProjet.includes(opt.key) ? '#dbeafe' : '#fff',
+              color: filtreEtatProjet.includes(opt.key) ? '#2563eb' : '#334155',
+              fontWeight: 600,
+              fontSize: 15,
+              cursor: 'pointer',
+              boxShadow: filtreEtatProjet.includes(opt.key) ? '0 2px 8px #2563eb22' : 'none',
+              transition: 'all 0.15s',
+            }}
+          >
+            {opt.label}
+          </button>
+        ))}
+        {filtreEtatProjet.length > 0 && (
+          <button type="button" onClick={() => setFiltreEtatProjet([])} style={{ marginLeft: 8, color: '#ef4444', background: 'none', border: 'none', fontWeight: 600, cursor: 'pointer' }}>Réinitialiser</button>
+        )}
+      </div>
       {/* Liste des clients filtrée */}
       <ul style={{ listStyle: 'none', padding: 0 }}>
         {(
           userRole === 'commercial'
             ? clients.filter(c => c.emailCommercial === user.email)
             : clients.filter(c => activeTab ? c.emailManager === activeTab : true)
-        ).length === 0 && (
+        )
+        // Filtrage par état du projet
+        .filter(client => {
+          if (filtreEtatProjet.length === 0) return true;
+          const etat = etatProjet[client.id] || {};
+          return filtreEtatProjet.some(key => etat[key]);
+        })
+        .length === 0 && (
           <li style={{ color: '#ef4444', fontWeight: 600 }}>
             Aucun client attribué.<br />
             <span style={{ fontWeight: 400, color: '#64748b' }}>
@@ -726,7 +799,14 @@ export default function MesClients() {
           userRole === 'commercial'
             ? clients.filter(c => c.emailCommercial === user.email)
             : clients.filter(c => activeTab ? c.emailManager === activeTab : true)
-        ).map((client) => {
+        )
+        // Filtrage par état du projet
+        .filter(client => {
+          if (filtreEtatProjet.length === 0) return true;
+          const etat = etatProjet[client.id] || {};
+          return filtreEtatProjet.some(key => etat[key]);
+        })
+        .map((client) => {
           // Récupération de l'état projet pour ce client
           const etat = etatProjet[client.id] || {};
           const etatsOrder = [
@@ -734,6 +814,7 @@ export default function MesClients() {
             { key: 'declarationValidee', label: 'Déclaration validée' },
             { key: 'declarationEnCours', label: 'Déclaration en cours' },
             { key: 'vendu', label: 'Vendu' },
+            { key: 'nonVendu', label: 'Non vendu' },
             { key: 'attente', label: 'En attente' },
             { key: 'rdvFait', label: 'RDV fait' }
           ];
@@ -776,8 +857,34 @@ export default function MesClients() {
                       })}
                     </div>
                   )}
-                  <input type="text" name="professionMR" placeholder="Profession de MR" value={editClient.professionMR} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} />
-                  <input type="text" name="professionMME" placeholder="Profession de Mme" value={editClient.professionMME} onChange={handleChangeEditClient} style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} />
+                  {/* Sélection du kit/centrale */}
+                  <select
+                    name="modeleCentrale"
+                    value={editClient.modeleCentrale || ''}
+                    onChange={e => {
+                      const selectedKit = kits.find(k => k.value === e.target.value);
+                      setEditClient({
+                        ...editClient,
+                        modeleCentrale: e.target.value,
+                        prixCentrale: selectedKit ? selectedKit.prix : ''
+                      });
+                    }}
+                    style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }}
+                  >
+                    <option value="">Sélectionner une centrale</option>
+                    {kits.map(kit => (
+                      <option key={kit.value} value={kit.value}>{kit.label} ({kit.prix} €)</option>
+                    ))}
+                  </select>
+                  {/* Champ prix modifiable */}
+                  <input
+                    type="number"
+                    name="prixCentrale"
+                    placeholder="Prix centrale (€)"
+                    value={editClient.prixCentrale || ''}
+                    onChange={e => setEditClient({ ...editClient, prixCentrale: e.target.value })}
+                    style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15, width: 140 }}
+                  />
                   <button type="submit" style={{ padding: '6px 14px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Enregistrer</button>
                   <button type="button" onClick={() => { setEditId(null); setEditClient(null); }} style={{ padding: '6px 14px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Annuler</button>
                 </form>
@@ -1199,13 +1306,14 @@ export default function MesClients() {
                     }}>
                       <div style={{ background: '#fff', borderRadius: 12, padding: 32, minWidth: 320, boxShadow: '0 2px 16px #0002', position: 'relative' }}>
                         <h3 style={{ marginBottom: 18, color: '#2563eb' }}>État du projet</h3>
-                        {['rdvFait','attente','vendu','declarationEnCours','declarationValidee','installe'].map(key => (
+                        {['rdvFait','attente','vendu','nonVendu','declarationEnCours','declarationValidee','installe'].map(key => (
                           <div key={key} style={{ marginBottom: 10 }}>
                             <label style={{ fontWeight: 600, marginRight: 12 }}>
                               <input type="checkbox" checked={!!etatProjet[showEtatProjetId]?.[key]} onChange={e => handleChangeEtatProjet(key, e.target.checked)} />
                               {key === 'rdvFait' ? 'RDV fait' :
                                key === 'attente' ? 'En attente' :
                                key === 'vendu' ? 'Vendu' :
+                               key === 'nonVendu' ? 'Non vendu' :
                                key === 'declarationEnCours' ? 'Déclaration en cours' :
                                key === 'declarationValidee' ? 'Déclaration validée' :
                                key === 'installe' ? 'Installé' : key}
@@ -1234,13 +1342,14 @@ export default function MesClients() {
         }}>
           <div style={{ background: '#fff', borderRadius: 12, padding: 32, minWidth: 320, boxShadow: '0 2px 16px #0002', position: 'relative' }}>
             <h3 style={{ marginBottom: 18, color: '#2563eb' }}>État du projet</h3>
-            {['rdvFait','attente','vendu','declarationEnCours','declarationValidee','installe'].map(key => (
+            {['rdvFait','attente','vendu','nonVendu','declarationEnCours','declarationValidee','installe'].map(key => (
               <div key={key} style={{ marginBottom: 10 }}>
                 <label style={{ fontWeight: 600, marginRight: 12 }}>
                   <input type="checkbox" checked={!!etatProjet[showEtatProjetId]?.[key]} onChange={e => handleChangeEtatProjet(key, e.target.checked)} />
                   {key === 'rdvFait' ? 'RDV fait' :
                    key === 'attente' ? 'En attente' :
                    key === 'vendu' ? 'Vendu' :
+                   key === 'nonVendu' ? 'Non vendu' :
                    key === 'declarationEnCours' ? 'Déclaration en cours' :
                    key === 'declarationValidee' ? 'Déclaration validée' :
                    key === 'installe' ? 'Installé' : key}

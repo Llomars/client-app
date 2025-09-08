@@ -6,20 +6,6 @@ import { useNavigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 
 export default function UserManagement() {
-  // Handler pour enregistrer un utilisateur modifié
-  const handleSaveUser = async (user) => {
-    try {
-      await setDoc(doc(db, 'users', user.id), {
-        email: user.email,
-        role: user.role,
-        managerEmail: user.role === 'commercial' ? user.managerEmail || '' : null,
-      }, { merge: true });
-      // Optionnel : toast ou message de succès
-    } catch (error) {
-      setError(error.message);
-    }
-  };
-
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState('commercial');
@@ -41,19 +27,6 @@ export default function UserManagement() {
       } else {
         setUserRole(null);
       }
-    });
-    getDocs(collection(db, 'users')).then(snap => {
-      const allUsers = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      // Filtre les doublons par email
-      const uniqueUsers = [];
-      const seenEmails = new Set();
-      for (const user of allUsers) {
-        if (user.email && !seenEmails.has(user.email)) {
-          uniqueUsers.push(user);
-          seenEmails.add(user.email);
-        }
-      }
-      setUsers(uniqueUsers);
     });
     return () => unsub();
   }, []);
@@ -117,189 +90,163 @@ export default function UserManagement() {
     fetchUsers();
   }, []);
 
-  // Fonction pour mettre à jour le rôle des commerciaux en masse
-  const handleUpdateRolesCommerciaux = async () => {
-    const commerciauxToUpdate = users.filter(u => u.managerEmail && u.role !== 'commercial');
-    for (const comm of commerciauxToUpdate) {
-      try {
-        await setDoc(doc(db, 'users', comm.id), { ...comm, role: 'commercial' }, { merge: true });
-      } catch (e) {
-        setError('Erreur mise à jour rôle pour ' + comm.email + ': ' + e.message);
-      }
-    }
-    // Recharge la liste après update
-    const q = query(collection(db, 'users'));
-    const snapshot = await getDocs(q);
-    setUsers(snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    alert('Rôles commerciaux mis à jour !');
-  };
-
   return (
-    <div>
-      {!authChecked && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '80vh', background: '#f1f5f9' }}>
-          <h2 style={{ color: '#6366f1', fontWeight: 800, fontSize: 32 }}>Chargement...</h2>
+    !authChecked ? (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '80vh', background: '#f1f5f9' }}>
+        <h2 style={{ color: '#6366f1', fontWeight: 800, fontSize: 32 }}>Chargement...</h2>
+      </div>
+    ) : userRole === 'admin' ? (
+      <div style={{ padding: '20px' }}>
+        <h1>Gestion des utilisateurs</h1>
+        <div style={{ marginBottom: '20px' }}>
+          <label>Email :</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            style={{ marginLeft: '10px' }}
+          />
         </div>
-      )}
-      {authChecked && userRole === 'admin' && (
-        <div style={{ padding: '20px' }}>
-          <h1>Gestion des utilisateurs</h1>
+        <div style={{ marginBottom: '20px' }}>
+          <label>Mot de passe :</label>
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            style={{ marginLeft: '10px' }}
+          />
+        </div>
+        <div style={{ marginBottom: '20px' }}>
+          <label>Rôle :</label>
+          <select
+            value={role}
+            onChange={(e) => setRole(e.target.value)}
+            style={{ marginLeft: '10px' }}
+          >
+            <option value="commercial">Commercial</option>
+            <option value="manager">Manager</option>
+            <option value="admin">Admin</option>
+            <option value="phoneur">Phoneur</option>
+          </select>
+        </div>
+        {role === 'commercial' && (
           <div style={{ marginBottom: '20px' }}>
-            <label>Email :</label>
+            <label>Email du manager :</label>
             <input
               type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              value={managerEmail}
+              onChange={(e) => setManagerEmail(e.target.value)}
               style={{ marginLeft: '10px' }}
             />
           </div>
-          <div style={{ marginBottom: '20px' }}>
-            <label>Mot de passe :</label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={{ marginLeft: '10px' }}
-            />
+        )}
+        <button
+          onClick={handleCreateOrUpdateUser}
+          style={{
+            background: '#3b82f6',
+            color: '#fff',
+            padding: '10px 20px',
+            border: 'none',
+            borderRadius: '5px',
+            cursor: 'pointer',
+          }}
+        >
+          Créer ou mettre à jour utilisateur
+        </button>
+        {error && (
+          <div style={{ color: 'red', marginTop: '20px' }}>
+            <strong>Erreur :</strong> {error}
           </div>
-          <div style={{ marginBottom: '20px' }}>
-            <label>Rôle :</label>
-            <select
-              value={role}
-              onChange={(e) => setRole(e.target.value)}
-              style={{ marginLeft: '10px' }}
-            >
-              <option value="commercial">Commercial</option>
-              <option value="manager">Manager</option>
-              <option value="admin">Admin</option>
-              <option value="phoneur">Phoneur</option>
-            </select>
-          </div>
-          {role === 'commercial' && (
-            <div style={{ marginBottom: '20px' }}>
-              <label>Email du manager :</label>
-              <input
-                type="email"
-                value={managerEmail}
-                onChange={(e) => setManagerEmail(e.target.value)}
-                style={{ marginLeft: '10px' }}
-              />
-            </div>
-          )}
-          <button
-            onClick={handleCreateOrUpdateUser}
-            style={{
-              background: '#3b82f6',
-              color: '#fff',
-              padding: '10px 20px',
-              border: 'none',
-              borderRadius: '5px',
-              cursor: 'pointer',
-            }}
-          >
-            Créer ou mettre à jour utilisateur
-          </button>
-          {error && (
-            <div style={{ color: 'red', marginTop: '20px' }}>
-              <strong>Erreur :</strong> {error}
-            </div>
-          )}
-          <button
-            onClick={handleUpdateRolesCommerciaux}
-            style={{
-              marginBottom: 18,
-              padding: '8px 18px',
-              background: '#10b981',
-              color: '#fff',
-              border: 'none',
-              borderRadius: 6,
-              fontWeight: 600,
-              fontSize: 16,
-              cursor: 'pointer',
-            }}
-          >
-            Mettre à jour les rôles commerciaux
-          </button>
-          <h2 style={{ marginTop: 40, fontSize: 24, color: '#1e293b', fontWeight: 700 }}>Liste des utilisateurs</h2>
-          <div style={{ overflowX: 'auto', marginTop: 18 }}>
-            <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 10px' }}>
-              <thead>
-                <tr>
-                  <th style={{ textAlign: 'left', background: '#f1f5f9', padding: 12, borderRadius: 8, color: '#334155', fontWeight: 600 }}>Email</th>
-                  <th style={{ textAlign: 'left', background: '#f1f5f9', padding: 12, borderRadius: 8, color: '#334155', fontWeight: 600 }}>Rôle</th>
-                  <th style={{ textAlign: 'left', background: '#f1f5f9', padding: 12, borderRadius: 8, color: '#334155', fontWeight: 600 }}>Manager</th>
-                  <th style={{ textAlign: 'left', background: '#f1f5f9', padding: 12, borderRadius: 8, color: '#334155', fontWeight: 600 }}>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {users.map((user) => (
-                  <tr key={user.id} style={{ background: '#fff', borderRadius: 10, boxShadow: '0 2px 8px #2563eb11' }}>
-                    <td style={{ padding: 12, fontWeight: 500, color: '#2563eb' }}>{user.email}</td>
-                    <td style={{ padding: 12 }}>
+        )}
+        <h2 style={{ marginTop: 40, fontSize: 24, color: '#1e293b', fontWeight: 700 }}>Liste des utilisateurs</h2>
+        <div style={{ overflowX: 'auto', marginTop: 18 }}>
+          <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: '0 10px' }}>
+            <thead>
+              <tr>
+                <th style={{ textAlign: 'left', background: '#f1f5f9', padding: 12, borderRadius: 8, color: '#334155', fontWeight: 600 }}>Email</th>
+                <th style={{ textAlign: 'left', background: '#f1f5f9', padding: 12, borderRadius: 8, color: '#334155', fontWeight: 600 }}>Rôle</th>
+                <th style={{ textAlign: 'left', background: '#f1f5f9', padding: 12, borderRadius: 8, color: '#334155', fontWeight: 600 }}>Manager</th>
+                <th style={{ textAlign: 'left', background: '#f1f5f9', padding: 12, borderRadius: 8, color: '#334155', fontWeight: 600 }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {users.map((user) => (
+                <tr key={user.id} style={{ background: '#fff', borderRadius: 10, boxShadow: '0 2px 8px #2563eb11' }}>
+                  <td style={{ padding: 12, fontWeight: 500, color: '#2563eb' }}>{user.email}</td>
+                  <td style={{ padding: 12 }}>
+                    <select
+                      value={user.role || ''}
+                      onChange={e => {
+                        const newRole = e.target.value;
+                        setUsers(users.map(u => u.id === user.id ? { ...u, role: newRole } : u));
+                      }}
+                      style={{ padding: 8, borderRadius: 6, border: '1px solid #e5e7eb', background: '#f8fafc', fontWeight: 500 }}
+                    >
+                      <option value="commercial">Commercial</option>
+                      <option value="manager">Manager</option>
+                      <option value="admin">Admin</option>
+                      <option value="phoneur">Phoneur</option>
+                    </select>
+                  </td>
+                  <td style={{ padding: 12 }}>
+                    {user.role === 'commercial' ? (
                       <select
-                        value={user.role || ''}
+                        value={user.managerEmail || ''}
                         onChange={e => {
-                          const newRole = e.target.value;
-                          setUsers(users.map(u => u.id === user.id ? { ...u, role: newRole } : u));
+                          setUsers(users.map(u => u.id === user.id ? { ...u, managerEmail: e.target.value } : u));
                         }}
                         style={{ padding: 8, borderRadius: 6, border: '1px solid #e5e7eb', background: '#f8fafc', fontWeight: 500 }}
                       >
-                        <option value="commercial">Commercial</option>
-                        <option value="manager">Manager</option>
-                        <option value="admin">Admin</option>
-                        <option value="phoneur">Phoneur</option>
+                        <option value="">Aucun manager</option>
+                        {users.filter((u) => u.role === 'manager' || u.role === 'admin').map((m) => (
+                          <option key={m.id} value={m.email}>{m.email}</option>
+                        ))}
                       </select>
-                    </td>
-                    <td style={{ padding: 12 }}>
-                      {user.role === 'commercial' ? (
-                        <select
-                          value={user.managerEmail || ''}
-                          onChange={e => {
-                            setUsers(users.map(u => u.id === user.id ? { ...u, managerEmail: e.target.value } : u));
-                          }}
-                          style={{ padding: 8, borderRadius: 6, border: '1px solid #e5e7eb', background: '#f8fafc', fontWeight: 500 }}
-                        >
-                          <option value="">Aucun manager</option>
-                          {users.filter((u) => u.role === 'manager' || u.role === 'admin').map((m) => (
-                            <option key={m.id} value={m.email}>{m.email}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <span style={{ color: '#64748b', fontStyle: 'italic' }}>—</span>
-                      )}
-                    </td>
-                    <td style={{ padding: 12 }}>
-                      <button
-                        onClick={() => handleSaveUser(user)}
-                        style={{
-                          background: '#10b981',
-                          color: '#fff',
-                          border: 'none',
-                          borderRadius: 6,
-                          padding: '8px 18px',
-                          fontWeight: 600,
-                          cursor: 'pointer',
-                          boxShadow: '0 2px 8px #10b98122',
-                          transition: 'background 0.15s',
-                        }}
-                      >
-                        Enregistrer
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    ) : (
+                      <span style={{ color: '#64748b', fontStyle: 'italic' }}>—</span>
+                    )}
+                  </td>
+                  <td style={{ padding: 12 }}>
+                    <button
+                      onClick={async () => {
+                        try {
+                          await setDoc(doc(db, 'users', user.id), {
+                            email: user.email,
+                            role: user.role,
+                            managerEmail: user.role === 'commercial' ? user.managerEmail || '' : null,
+                          }, { merge: true });
+                          // Optionnel : toast ou message de succès
+                        } catch (error) {
+                          setError(error.message);
+                        }
+                      }}
+                      style={{
+                        background: '#10b981',
+                        color: '#fff',
+                        border: 'none',
+                        borderRadius: 6,
+                        padding: '8px 18px',
+                        fontWeight: 600,
+                        cursor: 'pointer',
+                        boxShadow: '0 2px 8px #10b98122',
+                        transition: 'background 0.15s',
+                      }}
+                    >
+                      Enregistrer
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
-      {authChecked && userRole !== 'admin' && (
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '80vh', background: '#f1f5f9' }}>
-          <img src="/logopur.png" alt="Logo Botaik" style={{ width: 180, marginBottom: 32 }} />
-          <h2 style={{ color: '#6366f1', fontWeight: 800, fontSize: 32 }}>Bienvenue sur Botaik CRM</h2>
-          <p style={{ color: '#334155', fontSize: 18, marginTop: 12 }}>Vous n'avez pas accès à la gestion des utilisateurs.</p>
-        </div>
-      )}
-    </div>
+      </div>
+    ) : (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '80vh', background: '#f1f5f9' }}>
+        <img src="/logopur.png" alt="Logo Botaik" style={{ width: 180, marginBottom: 32 }} />
+        <h2 style={{ color: '#6366f1', fontWeight: 800, fontSize: 32 }}>Bienvenue sur Botaik CRM</h2>
+        <p style={{ color: '#334155', fontSize: 18, marginTop: 12 }}>Vous n'avez pas accès à la gestion des utilisateurs.</p>
+      </div>
+    )
   );
 }

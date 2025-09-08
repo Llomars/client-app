@@ -6,11 +6,19 @@ const app = express();
 app.use(cors());
 
 app.get('/pvgis', async (req, res) => {
-  const { url } = req.query;
+  let { url } = req.query;
   console.log('Requête proxy PVGIS:', url); // Log l'URL reçue
   if (!url) return res.status(400).json({ error: 'Missing url param' });
   try {
-    const response = await axios.get(url);
+    // Force raddatabase=PVGIS-SARAH3
+    const urlObj = new URL(url);
+    while (urlObj.searchParams.has('raddatabase')) {
+      urlObj.searchParams.delete('raddatabase');
+    }
+    urlObj.searchParams.append('raddatabase', 'PVGIS-SARAH3');
+    const forcedUrl = urlObj.toString();
+    console.log('URL relayée (SARAH3 forcé):', forcedUrl);
+    const response = await axios.get(forcedUrl);
     console.log('Réponse PVGIS status:', response.status);
     // Affiche un extrait de la réponse pour debug
     console.log('Réponse PVGIS data:', JSON.stringify(response.data).slice(0, 500));

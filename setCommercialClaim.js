@@ -1,22 +1,31 @@
 const admin = require('firebase-admin');
-const serviceAccount = require('./serviceAccountKey.json');
+const serviceAccount = require('./botaik-app-firebase-adminsdk-fbsvc-0f60baa462.json');
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
 
-const uid = process.argv[2]; // UID passé en argument
-if (!uid) {
-  console.error('Usage: node setCommercialClaim.js <UID>');
-  process.exit(1);
+// Liste des emails à traiter
+const emails = [
+  'clement.viart@botaik.com',
+  'corentin.chaneyin@botaik.com',
+  'eric.nadiama@botaik.com',
+  'fabien.dirollo@botaik.com',
+  'simon.menard@botaik.com',
+  'contact@botaik.com'
+];
+
+async function setClaimsForAll() {
+  for (const email of emails) {
+    try {
+      const userRecord = await admin.auth().getUserByEmail(email);
+      await admin.auth().setCustomUserClaims(userRecord.uid, { role: 'commercial' });
+      console.log(`Rôle commercial attribué à l'utilisateur ${email}`);
+    } catch (err) {
+      console.error(`Erreur pour ${email}:`, err.message);
+    }
+  }
+  process.exit(0);
 }
 
-admin.auth().setCustomUserClaims(uid, { role: 'commercial' })
-  .then(() => {
-    console.log('Rôle commercial attribué à l\'utilisateur', uid);
-    process.exit(0);
-  })
-  .catch((err) => {
-    console.error('Erreur lors de l\'attribution du rôle:', err);
-    process.exit(1);
-  });
+setClaimsForAll();

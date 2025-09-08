@@ -2,29 +2,73 @@ import React from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../firebaseConfig';
 import { Bar, BarChart, LabelList, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { getAuth, onAuthStateChanged } from 'firebase/auth';
 
 
 // --- Dashboard Commercial ---
 
 export default function CommercialDashboard() {
-
   // Onglets du dashboard
   const [activeTab, setActiveTab] = React.useState('dashboard');
-
   // États pour clients et commerciaux (utilisés dans PerformanceSection)
   const [clients, setClients] = React.useState([]);
   const [commerciaux, setCommerciaux] = React.useState([]);
+  const [user, setUser] = React.useState(null);
 
-  // Exemple de stats (à remplacer par tes vraies données)
-  const caMois = null;
-  const ventesMois = null;
-  const salaireFixe = 1500;
+  React.useEffect(() => {
+    const auth = getAuth();
+    const unsub = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+    });
+    return () => unsub();
+  }, []);
+
+  // --- CALCUL DYNAMIQUE DU CA, VENTES ET COMMISSION DU MOIS ---
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+  // Filtre les clients du commercial connecté
+  const myClients = user ? clients.filter(c => c.emailCommercial === user.email) : [];
+  const ventesMois = myClients.filter(c => {
+    if (!c.statut || (c.statut !== 'Vendu' && c.statut !== 'Signé')) return false;
+    if (!c.dateVente) return false;
+    const d = new Date(c.dateVente);
+    return d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear;
+  });
+  const caMois = ventesMois.reduce((sum, c) => sum + (parseFloat(c.prixCentrale) || 0), 0);
+  const nbVentesMois = ventesMois.length;
   const commission = 0.05; // 5%
-  const totalCommission = caMois ? caMois * commission : 0;
+  const totalCommission = caMois * commission;
+  const salaireFixe = 1500;
   const salaireTotal = salaireFixe + totalCommission;
 
-  // Données pour le graphique (exemple)
-  const months = [];
+  // Données pour le graphique (CA & ventes sur 6 derniers mois)
+  const months = React.useMemo(() => {
+    // Crée un tableau des 6 derniers mois (y compris le mois courant)
+    const arr = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      arr.push({
+        label: d.toLocaleString('fr-FR', { month: 'short', year: '2-digit' }),
+        month: d.getMonth() + 1,
+        year: d.getFullYear(),
+        CA: 0,
+        ventes: 0
+      });
+    }
+    // Remplit CA et ventes pour chaque mois
+    myClients.forEach(c => {
+      if (!c.statut || (c.statut !== 'Vendu' && c.statut !== 'Signé')) return;
+      if (!c.dateVente) return;
+      const d = new Date(c.dateVente);
+      const idx = arr.findIndex(m => m.month === d.getMonth() + 1 && m.year === d.getFullYear());
+      if (idx !== -1) {
+        arr[idx].CA += parseFloat(c.prixCentrale) || 0;
+        arr[idx].ventes += 1;
+      }
+    });
+    return arr;
+  }, [myClients, now]);
 
   // Récupération des données Firestore pour clients et commerciaux
   React.useEffect(() => {
@@ -102,16 +146,40 @@ export default function CommercialDashboard() {
         <div>
           {/* ...stats, graphiques, etc. à compléter selon l'ancien code... */}
           <h2>Statistiques générales</h2>
+          {user && (
+            <div style={{ marginBottom: 12, color: '#64748b', fontSize: 15 }}>
+              <b>Utilisateur connecté :</b> {user.email}
+            </div>
+          )}
+          {/* DEBUG: Affichage des clients filtrés pour le dashboard */}
+          <details style={{marginBottom: 20, background: '#f8fafc', padding: 10, borderRadius: 8, color: '#334155'}}>
+            <summary style={{cursor: 'pointer', fontWeight: 600}}>Voir les clients pris en compte dans le dashboard</summary>
+            <div style={{fontSize: 14}}>
+              {myClients.length === 0 ? 'Aucun client trouvé pour ce commercial.' : (
+                <ul>
+                  {myClients.map(c => (
+                    <li key={c.id}>
+                      <b>{c.nom} {c.prenom}</b> | Statut: {c.statut} | Prix: {c.prixCentrale} | Date vente: {c.dateVente || '-'}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </details>
           {/* ...exemple de stats... */}
           <div style={{ display: 'flex', gap: 20, marginBottom: 40 }}>
             {/* ...cartes stats... */}
             <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderLeft: '6px solid #3b82f6' }}>
               <div style={{ color: '#6b7280', fontSize: 14 }}>CA total du mois</div>
-              <div style={{ color: '#3b82f6', fontSize: 28, fontWeight: 700 }}>{caMois !== null ? caMois.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' }) : 'Données indisponibles'}</div>
+              <div style={{ color: '#3b82f6', fontSize: 28, fontWeight: 700 }}>{caMois ? caMois.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' }) : '0 €'}</div>
             </div>
             <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderLeft: '6px solid #10b981' }}>
               <div style={{ color: '#6b7280', fontSize: 14 }}>Ventes du mois</div>
-              <div style={{ color: '#10b981', fontSize: 28, fontWeight: 700 }}>{ventesMois !== null ? ventesMois : 'Données indisponibles'}</div>
+              <div style={{ color: '#10b981', fontSize: 28, fontWeight: 700 }}>{nbVentesMois}</div>
+            </div>
+            <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderLeft: '6px solid #f59e42' }}>
+              <div style={{ color: '#6b7280', fontSize: 14 }}>Commission du mois</div>
+              <div style={{ color: '#f59e42', fontSize: 28, fontWeight: 700 }}>{totalCommission ? totalCommission.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' }) : '0 €'}</div>
             </div>
             <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', borderLeft: '6px solid #6366f1' }}>
               <div style={{ color: '#6b7280', fontSize: 14 }}>Salaire total</div>
@@ -161,10 +229,6 @@ export default function CommercialDashboard() {
 
 // --- Section Performance ---
 function PerformanceSection({ clients, commerciaux }) {
-  // Génère des fausses ventes pour juillet 2025, mais utilise les utilisateurs réels Firebase
-  const professions = ['Artisan', 'Comptable', 'Retraité', 'Professeur', 'Cadre', 'Médecin', 'Commerçant', 'Infirmière', 'Ingénieur', 'Avocat'];
-  function randomInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
-  function randomProf() { return professions[randomInt(0, professions.length - 1)]; }
   // Utilisateurs réels Firebase avec rôle commercial, Manager ou Admin (case insensitive, sans doublons d'email)
   const realCommerciaux = [];
   const seenEmails = new Set();
@@ -175,39 +239,11 @@ function PerformanceSection({ clients, commerciaux }) {
       seenEmails.add(com.email);
     }
   });
-  // Pour chaque commercial réel, génère entre 2 et 6 ventes aléatoires en juillet 2025
-  const fakeClients = realCommerciaux.flatMap(com => {
-    const nbVentes = randomInt(2, 6);
-    return Array.from({ length: nbVentes }).map((_, i) => {
-      const prix = randomInt(5000, 20000);
-      const day = randomInt(1, 28);
-      return {
-        id: `${com.id}-juillet-${i}`,
-        nom: `Client${com.nom || ''}${i+1}`,
-        prenom: `Prénom${i+1}`,
-        statut: 'Vendu',
-        prixCentrale: prix,
-        dateVente: `2025-07-${day.toString().padStart(2, '0')}`,
-        emailCommercial: com.email,
-        professionMr: randomProf(),
-        professionMme: randomProf()
-      };
-    });
-  });
-  // Utilise les fausses données si aucune vente réelle pour la période sélectionnée
+  // Utilise uniquement les vraies données Firestore
   const [selectedMonth, setSelectedMonth] = React.useState(7);
   const [selectedYear, setSelectedYear] = React.useState(2025);
-  // Vérifie s'il y a des ventes réelles pour la période sélectionnée
-  const hasRealSales = clients.some(c => {
-    const d = c.dateVente ? new Date(c.dateVente) : null;
-    return d && d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear && (c.statut === 'Vendu' || c.statut === 'Signé');
-  });
-  const isFake = !hasRealSales;
-  const allClients = isFake ? fakeClients : clients;
-  // Pour juillet 2025, utilise les utilisateurs réels Firebase
-  const allCommerciaux = isFake
-    ? realCommerciaux.map(com => ({ ...com, displayName: com.email }))
-    : realCommerciaux;
+  const allClients = clients;
+  const allCommerciaux = realCommerciaux;
 
   // Filtre de mois
   // Toujours initialiser sur juillet 2025
@@ -237,12 +273,8 @@ function PerformanceSection({ clients, commerciaux }) {
       }
       return sum;
     }, 0);
-    let displayName;
-    if (isFake) {
-      displayName = com.email;
-    } else {
-      displayName = com.nom && com.prenom ? `${com.nom} ${com.prenom}` : (com.nom || com.prenom || com.email);
-    }
+    // Toujours utiliser le nom/prénom/email réel
+    const displayName = com.nom && com.prenom ? `${com.nom} ${com.prenom}` : (com.nom || com.prenom || com.email);
     return {
       ...com,
       caMois,
@@ -263,12 +295,8 @@ function PerformanceSection({ clients, commerciaux }) {
       }
       return sum;
     }, 0);
-    let displayName;
-    if (isFake) {
-      displayName = com.email;
-    } else {
-      displayName = com.nom && com.prenom ? `${com.nom} ${com.prenom}` : (com.nom || com.prenom || com.email);
-    }
+    // Toujours utiliser le nom/prénom/email réel
+    const displayName = com.nom && com.prenom ? `${com.nom} ${com.prenom}` : (com.nom || com.prenom || com.email);
     return {
       ...com,
       caAnnee,
@@ -465,7 +493,7 @@ function PerformanceSection({ clients, commerciaux }) {
                 >
                   {crown}
                   <div style={{ fontWeight: 700, fontSize: 22, color: '#6366f1', marginBottom: 6, letterSpacing: 1 }}>{emoji} #{idx + 1}</div>
-                <div style={{ fontWeight: 600, fontSize: 18, color: '#334155', marginBottom: 4 }}>{com.displayName}</div>
+                  <div style={{ fontWeight: 600, fontSize: 18, color: '#334155', marginBottom: 4 }}>{com.displayName}</div>
                   <div style={{ fontSize: 15, color: '#64748b', marginBottom: 6 }}>CA annuel</div>
                   <div style={{ fontSize: 22, color: '#2563eb', fontWeight: 700 }}>{com.caAnnee.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' })}</div>
                 </div>
