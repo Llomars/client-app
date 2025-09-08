@@ -1193,25 +1193,30 @@ export default function MesClients() {
                   )}
                   {/* MODAL ÉTAT PROJET */}
                   {showEtatProjetId && (
-                    <div className="modal-etat-projet">
-                      <h3>État du projet</h3>
-                      {['rdvFait','attente','vendu','declarationEnCours','declarationValidee','installe'].map(key => (
-                        <label key={key} style={{ display: 'block', marginBottom: 8 }}>
-                          <input
-                            type="checkbox"
-                            checked={!!(etatProjet[showEtatProjetId] && etatProjet[showEtatProjetId][key])}
-                            onChange={e => handleChangeEtatProjet(key, e.target.checked)}
-                          />
-                          {key === 'rdvFait' ? 'RDV fait' :
-                           key === 'attente' ? 'En attente' :
-                           key === 'vendu' ? 'Vendu' :
-                           key === 'declarationEnCours' ? 'Déclaration en cours' :
-                           key === 'declarationValidee' ? 'Déclaration validée' :
-                           key === 'installe' ? 'Installé' : key}
-                        </label>
-                      ))}
-                      <button onClick={() => handleSaveEtatProjet(showEtatProjetId)} style={{ marginTop: 12, padding: '8px 18px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>Enregistrer</button>
-                      <button onClick={() => setShowEtatProjetId(null)} style={{ marginLeft: 8, padding: '8px 18px', background: '#e5e7eb', color: '#334155', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>Annuler</button>
+                    <div style={{
+                      position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+                      background: 'rgba(0,0,0,0.25)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center'
+                    }}>
+                      <div style={{ background: '#fff', borderRadius: 12, padding: 32, minWidth: 320, boxShadow: '0 2px 16px #0002', position: 'relative' }}>
+                        <h3 style={{ marginBottom: 18, color: '#2563eb' }}>État du projet</h3>
+                        {['rdvFait','attente','vendu','declarationEnCours','declarationValidee','installe'].map(key => (
+                          <div key={key} style={{ marginBottom: 10 }}>
+                            <label style={{ fontWeight: 600, marginRight: 12 }}>
+                              <input type="checkbox" checked={!!etatProjet[showEtatProjetId]?.[key]} onChange={e => handleChangeEtatProjet(key, e.target.checked)} />
+                              {key === 'rdvFait' ? 'RDV fait' :
+                               key === 'attente' ? 'En attente' :
+                               key === 'vendu' ? 'Vendu' :
+                               key === 'declarationEnCours' ? 'Déclaration en cours' :
+                               key === 'declarationValidee' ? 'Déclaration validée' :
+                               key === 'installe' ? 'Installé' : key}
+                            </label>
+                          </div>
+                        ))}
+                        <div style={{ display: 'flex', gap: 16, marginTop: 24 }}>
+                          <button onClick={() => handleSaveEtatProjet(showEtatProjetId)} style={{ padding: '10px 24px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 16, cursor: 'pointer' }}>Enregistrer</button>
+                          <button onClick={() => setShowEtatProjetId(null)} style={{ padding: '10px 24px', background: '#e5e7eb', color: '#222', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 16, cursor: 'pointer' }}>Annuler</button>
+                        </div>
+                      </div>
                     </div>
                   )}
                 </>
@@ -1220,6 +1225,35 @@ export default function MesClients() {
           );
         })}
       </ul>
+
+      {/* MODAL ÉTAT PROJET */}
+      {showEtatProjetId && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh',
+          background: 'rgba(0,0,0,0.25)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center'
+        }}>
+          <div style={{ background: '#fff', borderRadius: 12, padding: 32, minWidth: 320, boxShadow: '0 2px 16px #0002', position: 'relative' }}>
+            <h3 style={{ marginBottom: 18, color: '#2563eb' }}>État du projet</h3>
+            {['rdvFait','attente','vendu','declarationEnCours','declarationValidee','installe'].map(key => (
+              <div key={key} style={{ marginBottom: 10 }}>
+                <label style={{ fontWeight: 600, marginRight: 12 }}>
+                  <input type="checkbox" checked={!!etatProjet[showEtatProjetId]?.[key]} onChange={e => handleChangeEtatProjet(key, e.target.checked)} />
+                  {key === 'rdvFait' ? 'RDV fait' :
+                   key === 'attente' ? 'En attente' :
+                   key === 'vendu' ? 'Vendu' :
+                   key === 'declarationEnCours' ? 'Déclaration en cours' :
+                   key === 'declarationValidee' ? 'Déclaration validée' :
+                   key === 'installe' ? 'Installé' : key}
+                </label>
+              </div>
+            ))}
+            <div style={{ display: 'flex', gap: 16, marginTop: 24 }}>
+              <button onClick={() => handleSaveEtatProjet(showEtatProjetId)} style={{ padding: '10px 24px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 16, cursor: 'pointer' }}>Enregistrer</button>
+              <button onClick={() => setShowEtatProjetId(null)} style={{ padding: '10px 24px', background: '#e5e7eb', color: '#222', border: 'none', borderRadius: 8, fontWeight: 700, fontSize: 16, cursor: 'pointer' }}>Annuler</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
