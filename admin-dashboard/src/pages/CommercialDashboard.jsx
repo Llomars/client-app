@@ -1,8 +1,8 @@
-import React from 'react';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../firebaseConfig';
-import { Bar, BarChart, LabelList, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
+import { collection, getDocs } from 'firebase/firestore';
+import React from 'react';
+import { Bar, BarChart, LabelList, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { db } from '../firebaseConfig';
 
 
 // --- Dashboard Commercial ---
@@ -37,7 +37,7 @@ export default function CommercialDashboard() {
   });
   const caMois = ventesMois.reduce((sum, c) => sum + (parseFloat(c.prixCentrale) || 0), 0);
   const nbVentesMois = ventesMois.length;
-  const commission = 0.05; // 5%
+  const commission = 0.04; // 4%
   const totalCommission = caMois * commission;
   const salaireFixe = 1500;
   const salaireTotal = salaireFixe + totalCommission;
@@ -239,9 +239,22 @@ function PerformanceSection({ clients, commerciaux }) {
       seenEmails.add(com.email);
     }
   });
-  // Utilise uniquement les vraies données Firestore
-  const [selectedMonth, setSelectedMonth] = React.useState(7);
-  const [selectedYear, setSelectedYear] = React.useState(2025);
+  // --- CA total du mois en cours (tous utilisateurs) ---
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+  const caTotalMois = clients.reduce((sum, c) => {
+    if (!c.statut || (c.statut !== 'Vendu' && c.statut !== 'Signé')) return sum;
+    if (!c.dateVente) return sum;
+    const d = new Date(c.dateVente);
+    if (d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear) {
+      return sum + (parseFloat(c.prixCentrale) || 0);
+    }
+    return sum;
+  }, 0);
+  // Initialisation dynamique sur le mois/année en cours
+  const [selectedMonth, setSelectedMonth] = React.useState(currentMonth);
+  const [selectedYear, setSelectedYear] = React.useState(currentYear);
   const allClients = clients;
   const allCommerciaux = realCommerciaux;
 
@@ -311,6 +324,11 @@ function PerformanceSection({ clients, commerciaux }) {
     <>
       <div>
         <h2>Performance commerciale</h2>
+        {/* CA total du mois en cours (tous utilisateurs) */}
+        <div style={{ background: '#fff', borderRadius: 12, padding: 20, boxShadow: '0 4px 12px rgba(0,0,0,0.07)', borderLeft: '6px solid #2563eb', marginBottom: 24, maxWidth: 400 }}>
+          <div style={{ color: '#6b7280', fontSize: 15 }}>CA total du mois (tous utilisateurs)</div>
+          <div style={{ color: '#2563eb', fontSize: 30, fontWeight: 700 }}>{caTotalMois ? caTotalMois.toLocaleString('fr-FR', { style: 'currency', currency: 'EUR' }) : '0 €'}</div>
+        </div>
         {/* Filtre de mois */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 18 }}>
           <span style={{ fontWeight: 600, fontSize: 16, color: '#334155' }}>Mois :</span>
