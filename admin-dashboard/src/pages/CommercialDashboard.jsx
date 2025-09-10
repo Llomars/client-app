@@ -609,7 +609,14 @@ function EquipeStatsSection() {
       const d = c.dateVente ? new Date(c.dateVente) : null;
       return d && d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear && c.statut === 'Vendu';
     }).length;
-    return { ca, rdvPris, rdvFaits, ventes, commerciaux: statsCommerciaux, equipe: equipeClients };
+    // RDV faits du mois : clients dont etatProjet === 'RDV fait' et dateEtatProjet dans le mois/année sélectionnés
+    const rdvFaitsMois = equipeClients.filter(c => {
+      if (c.etatProjet !== 'RDV fait') return false;
+      if (!c.dateEtatProjet) return false;
+      const d = new Date(c.dateEtatProjet);
+      return d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
+    }).length;
+    return { ca, rdvPris, rdvFaits, ventes, rdvFaitsMois, commerciaux: statsCommerciaux, equipe: equipeClients };
   };
 
   // Section détail de la journée en cours (filtrable)
@@ -628,8 +635,21 @@ function EquipeStatsSection() {
       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
         {managers.map(email => {
           const stats = getEquipeStats(email);
-          // Détail manager/admin
           const managerStats = statsVendeurs.find(s => s.email === email && s.mois === `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`) || {};
+          // RDV faits du jour : clients dont etatProjet === 'RDV fait' et dateEtatProjet == selectedDay
+          const rdvFaitsJour = stats.equipe.filter(c => {
+            if (c.etatProjet !== 'RDV fait') return false;
+            if (!c.dateEtatProjet) return false;
+            const d = new Date(c.dateEtatProjet);
+            return d.toISOString().slice(0, 10) === selectedDay;
+          }).length;
+          // Ventes du jour (inchangé)
+          const ventesJour = stats.equipe.filter(c => {
+            if (c.statut !== 'Vendu') return false;
+            if (!c.dateVente) return false;
+            const d = new Date(c.dateVente);
+            return d.toISOString().slice(0, 10) === selectedDay;
+          }).length;
           return (
             <div key={email} style={{ background: '#f1f5f9', borderRadius: 12, boxShadow: '0 2px 8px #2563eb11', padding: 18, minWidth: 320, borderLeft: '6px solid #6366f1', marginBottom: 12 }}>
               <div style={{ fontWeight: 700, fontSize: 16, color: '#6366f1', marginBottom: 6 }}>Manager : {email}</div>
@@ -637,20 +657,21 @@ function EquipeStatsSection() {
               <div style={{ marginBottom: 10, padding: '8px 12px', background: '#e0e7ff', borderRadius: 8 }}>
                 <div style={{ fontWeight: 600, color: '#334155', fontSize: 15, marginBottom: 2 }}>Manager/Admin : {email}</div>
                 <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>RDV pris : <b>{managerStats.nbRdvPris || 0}</b></div>
-                <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>RDV faits : <b>{managerStats.nbRdvFait || 0}</b></div>
-                <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>Vendus : <b>{stats.equipe.filter(c => c.statut === 'Vendu' && c.emailManager === email).length}</b></div>
+                <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>RDV faits : <b>{rdvFaitsJour}</b></div>
+                <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>Vendus : <b>{ventesJour}</b></div>
               </div>
               {stats.commerciaux.length === 0 ? (
                 <div style={{ fontSize: 14, color: '#64748b' }}>Aucun commercial attribué</div>
               ) : stats.commerciaux.map(com => {
-                // Détail du commercial
-                const ventesCom = stats.equipe.filter(c => c.statut === 'Vendu' && c.emailCommercial === com.email).length;
+                // RDV faits du jour pour chaque commercial
+                const rdvFaitsComJour = stats.equipe.filter(c => c.etatProjet === 'RDV fait' && c.emailCommercial === com.email && c.dateEtatProjet && (new Date(c.dateEtatProjet)).toISOString().slice(0, 10) === selectedDay).length;
+                const ventesComJour = stats.equipe.filter(c => c.statut === 'Vendu' && c.emailCommercial === com.email && c.dateVente && (new Date(c.dateVente)).toISOString().slice(0, 10) === selectedDay).length;
                 return (
                   <div key={com.email} style={{ marginBottom: 10, padding: '8px 12px', background: '#fff', borderRadius: 8 }}>
                     <div style={{ fontWeight: 600, color: '#334155', fontSize: 15, marginBottom: 2 }}>{com.nom || com.email}</div>
                     <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>RDV pris : <b>{com.nbRdvPris || 0}</b></div>
-                    <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>RDV faits : <b>{com.nbRdvFait || 0}</b></div>
-                    <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>Vendus : <b>{ventesCom}</b></div>
+                    <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>RDV faits : <b>{rdvFaitsComJour}</b></div>
+                    <div style={{ fontSize: 14, color: '#64748b', marginBottom: 2 }}>Vendus : <b>{ventesComJour}</b></div>
                   </div>
                 );
               })}
@@ -677,7 +698,18 @@ function EquipeStatsSection() {
     { value: 12, label: 'Décembre' }
   ];
 
-  // ...existing code...
+  // Stats du mois sélectionné (cumul RDV faits statut Projet sur le mois sélectionné)
+  const statsMoisCumul = React.useMemo(() => {
+    const moisActuel = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`;
+    return commerciaux.map(com => {
+      const statsCom = statsVendeurs.find(s => s.email === com.email && s.mois === moisActuel) || {};
+      return {
+        ...com,
+        rdvFaitsMois: statsCom.nbRdvFait || 0,
+      };
+    });
+  }, [commerciaux, statsVendeurs, selectedMonth, selectedYear]);
+
   return (
     <>
       {/* Section détail de la journée en cours */}

@@ -1,7 +1,7 @@
 import { onAuthStateChanged } from 'firebase/auth';
 import { addDoc, collection, deleteDoc, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { auth, db } from '../firebaseConfig';
 
 const storage = getStorage();
@@ -503,8 +503,7 @@ export default function MesClients() {
     { key: 'tele', label: 'Télé', type: 'bool', icon: '📺' },
     { key: 'plaque', label: 'Plaque électrique', type: 'bool', icon: '🍳' },
     { key: 'frigo', label: 'Frigo', type: 'number', icon: '🧊' },
-    { key: 'congelateur', label: 'Congélateur', type: 'bool', icon: '❄️' },
-    { key: 'clims', label: 'Clims', type: 'number', icon: '🌬️' },
+    { key: 'clims', label: 'Clims', type: 'number', icon: '🌬️' }, // Remplace congélateur par clims (nombre)
     { key: 'piscine', label: 'Piscine', type: 'bool', icon: '🏊' },
     { key: 'pompeChaleur', label: 'Pompe à chaleur', type: 'bool', icon: '🔥' },
     { key: 'jacuzzi', label: 'Jacuzzi', type: 'bool', icon: '🛁' },
@@ -512,6 +511,7 @@ export default function MesClients() {
     { key: 'caveVin', label: 'Cave à vin', type: 'bool', icon: '🍷' },
     { key: 'consolesPc', label: 'Consoles ou PC', type: 'bool', icon: '🎮' },
     { key: 'brasseurAir', label: "Brasseur d'air", type: 'bool', icon: '🌀' },
+    { key: 'resistanceElec', label: 'Résistance électrique', type: 'bool', icon: '💡' }, // Ajouté
     { key: 'autres', label: 'Autres (champ libre)', type: 'text', icon: '✨' }
   ];
 
@@ -1081,11 +1081,11 @@ export default function MesClients() {
                                 <label style={{ fontWeight: 600 }}>Frigo :</label>
                                 <input type="number" min={0} value={etudePerso?.frigo || 0} onChange={e => handleChangeEtudePerso('frigo', Number(e.target.value))} style={{ width: 60, padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} />
                               </div>
-                              {/* Congélateur */}
+                              {/* Clims */}
                               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <span style={{ fontSize: 22 }}>{etudePersoElements.find(e => e.key === 'congelateur')?.icon}</span>
-                                <label style={{ fontWeight: 600 }}>Congélateur :</label>
-                                <input type="number" min={0} value={etudePerso?.congelateur || 0} onChange={e => handleChangeEtudePerso('congelateur', Number(e.target.value))} style={{ width: 60, padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} />
+                                <span style={{ fontSize: 22 }}>{etudePersoElements.find(e => e.key === 'clims')?.icon}</span>
+                                <label style={{ fontWeight: 600 }}>Clims :</label>
+                                <input type="number" min={0} value={etudePerso?.clims || 0} onChange={e => handleChangeEtudePerso('clims', Number(e.target.value))} style={{ width: 60, padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} />
                               </div>
                             </div>
                             {/* Champ Autre */}

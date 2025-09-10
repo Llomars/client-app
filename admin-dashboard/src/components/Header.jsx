@@ -9,6 +9,7 @@ export default function Header() {
   const [showCalculateur, setShowCalculateur] = useState(false);
   const [user, setUser] = useState(null);
   const [role, setRole] = useState(null);
+  const [relancesJourCount, setRelancesJourCount] = useState(0);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -22,6 +23,17 @@ export default function Header() {
       }
     });
     return () => unsub();
+  }, []);
+
+  useEffect(() => {
+    // Écoute le localStorage pour la notif relances du jour
+    function updateCount() {
+      const count = Number(localStorage.getItem('relancesJourCount') || 0);
+      setRelancesJourCount(count);
+    }
+    window.addEventListener('storage', updateCount);
+    updateCount();
+    return () => window.removeEventListener('storage', updateCount);
   }, []);
 
   const handleLogout = async () => {
@@ -147,6 +159,43 @@ export default function Header() {
               📊 Calculateur
             </Link>
           )}
+          <Link
+            to="/relances"
+            style={{
+              background: '#fbbf24',
+              padding: '8px 16px',
+              borderRadius: '8px',
+              textDecoration: 'none',
+              color: '#fff',
+              fontWeight: '500',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              position: 'relative',
+            }}
+          >
+            <span role="img" aria-label="relances" style={{ fontSize: 20 }}>⏰</span>
+            Relances
+            {relancesJourCount > 0 && (
+              <span style={{
+                position: 'absolute',
+                top: -6,
+                right: -6,
+                background: '#ef4444',
+                color: '#fff',
+                borderRadius: '50%',
+                minWidth: 22,
+                height: 22,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 700,
+                fontSize: 14,
+                boxShadow: '0 2px 8px #ef444488',
+                zIndex: 2
+              }}>{relancesJourCount}</span>
+            )}
+          </Link>
 
           <button
             onClick={handleLogout}

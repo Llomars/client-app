@@ -1,0 +1,237 @@
+import { useEffect, useState } from 'react';
+import { addDoc, collection, getDocs, query, where, doc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { auth, db } from '../firebaseConfig';
+import { useNavigate } from 'react-router-dom';
+
+export default function Relances() {
+  const [selectedClient, setSelectedClient] = useState(null);
+  const [dateRelance, setDateRelance] = useState('');
+  const [commentaire, setCommentaire] = useState('');
+  const [clients, setClients] = useState([]);
+  const [user, setUser] = useState(null);
+  const [userRole, setUserRole] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [relances, setRelances] = useState([]);
+  const [relanceFilter, setRelanceFilter] = useState('jour'); // 'jour' ou 'avenir'
+  const [editId, setEditId] = useState(null);
+  const [editDate, setEditDate] = useState('');
+  const [editComment, setEditComment] = useState('');
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const unsub = auth.onAuthStateChanged(async (u) => {
+      setUser(u);
+      if (u) {
+        const tokenResult = await u.getIdTokenResult();
+        setUserRole(tokenResult.claims.role || null);
+        // Charger la liste des clients selon le rôle
+        let q;
+        if (tokenResult.claims.role === 'commercial') {
+          q = query(collection(db, 'clients'), where('emailCommercial', '==', u.email));
+        } else {
+          q = query(collection(db, 'clients'), where('emailManager', '==', u.email));
+        }
+        const snap = await getDocs(q);
+        setClients(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      }
+      setLoading(false);
+    });
+    return () => unsub();
+  }, []);
+
+  // Charger les relances de l'utilisateur
+  useEffect(() => {
+    if (!user) return;
+    async function fetchRelances() {
+      let q;
+      if (userRole === 'commercial') {
+        q = query(collection(db, 'relances'), where('creePar', '==', user.email));
+      } else {
+        // Pour manager/admin, toutes les relances de ses clients
+        const clientIds = clients.map(c => c.id);
+        if (clientIds.length === 0) return setRelances([]);
+        // Firestore ne supporte pas where in > 10, donc on filtre après
+        const snap = await getDocs(collection(db, 'relances'));
+        setRelances(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(r => clientIds.includes(r.clientId)));
+        return;
+      }
+      const snap = await getDocs(q);
+      setRelances(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }
+    fetchRelances();
+  }, [user, userRole, clients]);
+
+  // Ajout : fonction pour rafraîchir les relances
+  async function refreshRelances() {
+    let q;
+    if (userRole === 'commercial') {
+      q = query(collection(db, 'relances'), where('creePar', '==', user.email));
+    } else {
+      const clientIds = clients.map(c => c.id);
+      if (clientIds.length === 0) return setRelances([]);
+      const snap = await getDocs(collection(db, 'relances'));
+      setRelances(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })).filter(r => clientIds.includes(r.clientId)));
+      return;
+    }
+    const snap = await getDocs(q);
+    setRelances(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+  }
+
+  const handleSaveRelance = async () => {
+    if (!selectedClient || !dateRelance) return;
+    await addDoc(collection(db, 'relances'), {
+      clientId: selectedClient,
+      dateRelance,
+      commentaire,
+      creePar: user?.email,
+      creeLe: new Date().toISOString(),
+    });
+    alert('Relance enregistrée !');
+    setSelectedClient(null);
+    setDateRelance('');
+    setCommentaire('');
+    // Ajout : rafraîchir la liste après création
+    refreshRelances();
+  };
+
+  // Edition relance
+  const handleEditClick = (relance) => {
+    setEditId(relance.id);
+    setEditDate(relance.dateRelance);
+    setEditComment(relance.commentaire);
+  };
+  const handleEditSave = async (relance) => {
+    await updateDoc(doc(db, 'relances', relance.id), {
+      dateRelance: editDate,
+      commentaire: editComment,
+    });
+    setEditId(null);
+    setEditDate('');
+    setEditComment('');
+    refreshRelances();
+  };
+  const handleDelete = async (relance) => {
+    if (!window.confirm('Supprimer cette relance ?')) return;
+    await deleteDoc(doc(db, 'relances', relance.id));
+    refreshRelances();
+  };
+
+  // Filtres relances
+  const today = new Date();
+  const todayStr = today.toISOString().slice(0, 10);
+  const relancesDuJour = relances.filter(r => r.dateRelance === todayStr);
+  const relancesFiltrees = relances.filter(r => {
+    // On force le format AAAA-MM-JJ pour la comparaison
+    const relanceDate = r.dateRelance;
+    if (relanceFilter === 'jour') {
+      return relanceDate === todayStr;
+    } else {
+      // Relances à venir = date strictement supérieure à aujourd'hui
+      return relanceDate > todayStr;
+    }
+  });
+
+  // Met à jour le localStorage pour la pastille header
+  useEffect(() => {
+    localStorage.setItem('relancesJourCount', relancesDuJour.length);
+    window.dispatchEvent(new Event('storage'));
+  }, [relancesDuJour.length]);
+
+  if (loading) return <div style={{ padding: 40 }}>Chargement...</div>;
+
+  return (
+    <div style={{ padding: 40 }}>
+      <h2>Créer une relance</h2>
+      <div style={{ marginBottom: 24 }}>
+        <label style={{ fontWeight: 600 }}>Client :</label><br />
+        <select value={selectedClient || ''} onChange={e => setSelectedClient(e.target.value)} style={{ padding: 8, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 16, width: 260 }}>
+          <option value="">Sélectionner un client</option>
+          {clients.map(c => (
+            <option key={c.id} value={c.id}>{c.nom} {c.prenom}</option>
+          ))}
+        </select>
+      </div>
+      <div style={{ marginBottom: 24 }}>
+        <label style={{ fontWeight: 600 }}>Date de relance :</label><br />
+        <input type="date" value={dateRelance} onChange={e => setDateRelance(e.target.value)} style={{ padding: 8, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 16, width: 200 }} />
+      </div>
+      <div style={{ marginBottom: 24 }}>
+        <label style={{ fontWeight: 600 }}>Commentaire :</label><br />
+        <textarea value={commentaire} onChange={e => setCommentaire(e.target.value)} style={{ width: 400, minHeight: 60, borderRadius: 6, border: '1px solid #d1d5db', padding: 8, fontSize: 16 }} />
+      </div>
+      <button onClick={handleSaveRelance} disabled={!selectedClient || !dateRelance} style={{ padding: '8px 18px', background: '#2563eb', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>
+        Enregistrer la relance
+      </button>
+      <button onClick={() => navigate(-1)} style={{ marginLeft: 16, padding: '8px 18px', background: '#e5e7eb', color: '#334155', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>
+        Retour
+      </button>
+      <hr style={{ margin: '32px 0' }} />
+      <h2>Liste des relances</h2>
+      <div style={{ marginBottom: 18, display: 'flex', gap: 12 }}>
+        <button onClick={() => setRelanceFilter('jour')} style={{ padding: '8px 18px', background: relanceFilter === 'jour' ? '#2563eb' : '#e5e7eb', color: relanceFilter === 'jour' ? '#fff' : '#334155', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 16, cursor: 'pointer', position: 'relative' }}>
+          Relances du jour
+          {relancesDuJour.length > 0 && (
+            <span style={{
+              position: 'absolute',
+              top: -8,
+              right: -8,
+              background: '#ef4444',
+              color: '#fff',
+              borderRadius: '50%',
+              minWidth: 20,
+              height: 20,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+              fontSize: 13,
+              boxShadow: '0 2px 8px #ef444488',
+              zIndex: 2
+            }}>{relancesDuJour.length}</span>
+          )}
+        </button>
+        <button onClick={() => setRelanceFilter('avenir')} style={{ padding: '8px 18px', background: relanceFilter === 'avenir' ? '#2563eb' : '#e5e7eb', color: relanceFilter === 'avenir' ? '#fff' : '#334155', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>Relances à venir</button>
+      </div>
+      <ul style={{ listStyle: 'none', padding: 0 }}>
+        {relancesFiltrees.length === 0 && (
+          <li style={{ color: '#64748b', fontWeight: 600 }}>Aucune relance à afficher.</li>
+        )}
+        {relancesFiltrees.map(r => {
+          const client = clients.find(c => c.id === r.clientId);
+          return (
+            <li key={r.id} style={{ background: '#f1f5f9', borderRadius: 8, padding: 14, marginBottom: 10 }}>
+              {editId === r.id ? (
+                <>
+                  <div style={{ fontWeight: 600, fontSize: 16 }}>{client ? `${client.nom} ${client.prenom}` : 'Client inconnu'}</div>
+                  <div style={{ color: '#2563eb', fontWeight: 500 }}>
+                    Date de relance :
+                    <input type="date" value={editDate} onChange={e => setEditDate(e.target.value)} style={{ marginLeft: 8, padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }} />
+                  </div>
+                  <div style={{ fontSize: 15, margin: '6px 0' }}>
+                    Commentaire :
+                    <input type="text" value={editComment} onChange={e => setEditComment(e.target.value)} style={{ marginLeft: 8, padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15, width: 220 }} />
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                    <button onClick={() => handleEditSave(r)} style={{ padding: '6px 14px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Enregistrer</button>
+                    <button onClick={() => setEditId(null)} style={{ padding: '6px 14px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Annuler</button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div style={{ fontWeight: 600, fontSize: 16 }}>{client ? `${client.nom} ${client.prenom}` : 'Client inconnu'}</div>
+                  <div style={{ color: '#2563eb', fontWeight: 500 }}>Date de relance : {r.dateRelance}</div>
+                  <div style={{ fontSize: 15, margin: '6px 0' }}>Commentaire : {r.commentaire}</div>
+                  <div style={{ color: '#64748b', fontSize: 14 }}>Créée par : {r.creePar}</div>
+                  <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                    <button onClick={() => handleEditClick(r)} style={{ padding: '6px 14px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Modifier</button>
+                    <button onClick={() => handleDelete(r)} style={{ padding: '6px 14px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Supprimer</button>
+                  </div>
+                </>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
