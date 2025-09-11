@@ -207,8 +207,31 @@ export default function MesClients() {
       [name]: type === 'checkbox' ? checked : value
     }));
   };
+  // --- Ajout état pour message d'erreur prise rapide ---
+  const [erreurRapide, setErreurRapide] = useState('');
   const handleEnregistrerRapide = async () => {
-    if (!formRapide.nom || !formRapide.prenom || !formRapide.adresseClient || !formRapide.telClient || !user) return;
+    setErreurRapide('');
+    if (!formRapide.nom || !formRapide.prenom || !formRapide.adresseClient || !formRapide.telClient || !user) {
+      setErreurRapide('Merci de remplir tous les champs obligatoires.');
+      return;
+    }
+    // Cherche le manager si commercial
+    let emailManagerToUse = formRapide.emailManager || user.email;
+    let debugManagerEmail = '';
+    if (userRole === 'commercial') {
+      const userSnap = await getDocs(query(collection(db, 'users'), where('email', '==', user.email)));
+      let managerEmail = user.email;
+      if (!userSnap.empty) {
+        const userData = userSnap.docs[0].data();
+        if (userData.managerEmail) managerEmail = userData.managerEmail;
+        debugManagerEmail = userData.managerEmail || '';
+      }
+      if (!debugManagerEmail) {
+        setErreurRapide("Aucun manager n'est attribué à ce commercial. Veuillez contacter un administrateur.");
+        return;
+      }
+      emailManagerToUse = managerEmail;
+    }
     // Montant facture EDF
     let montantFactureEDF = '';
     if (formRapide.factureEdf === '30-90') montantFactureEDF = '30-90';
@@ -229,51 +252,54 @@ export default function MesClients() {
     if (formRapide.consoVoiture) elementsConso.push('Voiture électrique');
     if (formRapide.consoAutres) elementsConso.push('Autres');
     // Ajout Firestore
-    await addDoc(collection(db, 'clients'), {
-      nom: formRapide.nom,
-      prenom: formRapide.prenom,
-      adresse: formRapide.adresseClient,
-      telephone: formRapide.telClient,
-      montantFactureEDF,
-      surfaceToiture,
-      elementsConso,
-      professionMR: formRapide.professionMR,
-      ageMR: formRapide.ageMR,
-      professionMME: formRapide.professionMME,
-      ageMME: formRapide.ageMME,
-      emailManager: formRapide.emailManager || user.email,
-      emailCommercial: user.email, // accès commercial
-      email: '', // champ vide car non demandé
-      ville: '', // champ vide car non demandé
-      statut: 'En cours',
-      Etude: [],
-      docs: {},
-      debrief: { bien: '', moinsBien: '', ressenti: '', venteEffectuee: '' }
-    });
-    // Reset form
-    setFormRapide({
-      factureEdf: '',
-      surfaceToiture: '',
-      consoPiscine: false,
-      consoClim: false,
-      consoResistance: false,
-      consoJacuzzi: false,
-      consoVoiture: false,
-      consoAutres: false,
-      professionMR: '',
-      ageMR: '',
-      professionMME: '',
-      ageMME: '',
-      nom: '',
-      prenom: '',
-      adresseClient: '',
-      telClient: '',
-    });
-    // Refresh clients et met le dernier en haut
-    const q = query(collection(db, 'clients'), where('emailManager', '==', user.email));
-    const snap = await getDocs(q);
-    const refreshed = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-    setClients([...refreshed].reverse());
+    try {
+      await addDoc(collection(db, 'clients'), {
+        nom: formRapide.nom,
+        prenom: formRapide.prenom,
+        adresse: formRapide.adresseClient,
+        telephone: formRapide.telClient,
+        montantFactureEDF,
+        surfaceToiture,
+        elementsConso,
+        professionMR: formRapide.professionMR,
+        ageMR: formRapide.ageMR,
+        professionMME: formRapide.professionMME,
+        ageMME: formRapide.ageMME,
+        emailManager: emailManagerToUse,
+        emailCommercial: user.email,
+        email: '',
+        ville: '',
+        statut: 'En cours',
+        Etude: [],
+        docs: {},
+        debrief: { bien: '', moinsBien: '', ressenti: '', venteEffectuee: '' }
+      });
+      setFormRapide({
+        factureEdf: '',
+        surfaceToiture: '',
+        consoPiscine: false,
+        consoClim: false,
+        consoResistance: false,
+        consoJacuzzi: false,
+        consoVoiture: false,
+        consoAutres: false,
+        professionMR: '',
+        ageMR: '',
+        professionMME: '',
+        ageMME: '',
+        nom: '',
+        prenom: '',
+        adresseClient: '',
+        telClient: '',
+      });
+      // Refresh clients et met le dernier en haut
+      const q = query(collection(db, 'clients'), where('emailManager', '==', emailManagerToUse));
+      const snap = await getDocs(q);
+      const refreshed = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setClients([...refreshed].reverse());
+    } catch (err) {
+      setErreurRapide("Erreur lors de l'ajout du client : " + (err.message || err));
+    }
   };
 
   // --- Ajout état pour message d'erreur ---
@@ -300,35 +326,39 @@ export default function MesClients() {
         }
         emailManagerToUse = managerEmail;
       }
-      // DEBUG: Affiche la valeur récupérée pour managerEmail
-      console.log('DEBUG managerEmail utilisé pour le client:', emailManagerToUse, 'managerEmail Firestore:', debugManagerEmail);
-      await addDoc(collection(db, 'clients'), {
-        ...nouveauClient,
-        emailManager: emailManagerToUse,
-        emailCommercial: user.email, // accès commercial
-      });
-      setNouveauClient({
-        nom: '',
-        prenom: '',
-        adresse: '',
-        ville: '',
-        email: '',
-        telephone: '',
-        montantFactureEDF: '',
-        ageMR: '',
-        ageMME: '',
-        professionMR: '',
-        professionMME: '',
-      });
-      let q;
-      if (userRole === 'commercial') {
-        q = query(collection(db, 'clients'), where('emailCommercial', '==', user.email));
-      } else {
-        q = query(collection(db, 'clients'), where('emailManager', '==', user.email));
+      try {
+        // DEBUG: Affiche la valeur récupérée pour managerEmail
+        console.log('DEBUG managerEmail utilisé pour le client:', emailManagerToUse, 'managerEmail Firestore:', debugManagerEmail);
+        await addDoc(collection(db, 'clients'), {
+          ...nouveauClient,
+          emailManager: emailManagerToUse,
+          emailCommercial: user.email, // accès commercial
+        });
+        setNouveauClient({
+          nom: '',
+          prenom: '',
+          adresse: '',
+          ville: '',
+          email: '',
+          telephone: '',
+          montantFactureEDF: '',
+          ageMR: '',
+          ageMME: '',
+          professionMR: '',
+          professionMME: '',
+        });
+        let q;
+        if (userRole === 'commercial') {
+          q = query(collection(db, 'clients'), where('emailCommercial', '==', user.email));
+        } else {
+          q = query(collection(db, 'clients'), where('emailManager', '==', user.email));
+        }
+        const snap = await getDocs(q);
+        const refreshed = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        setClients([...refreshed].reverse());
+      } catch (err) {
+        setAjoutErreur("Erreur lors de l'ajout du client : " + (err.message || err));
       }
-      const snap = await getDocs(q);
-      const refreshed = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      setClients([...refreshed].reverse());
     } else {
       setAjoutErreur('Merci de remplir tous les champs obligatoires.');
     }
@@ -755,6 +785,7 @@ export default function MesClients() {
           <input type="text" name="telClient" value={formRapide.telClient} onChange={handleChangeFormRapide} placeholder="Numéro de téléphone" style={{ padding: 8, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 16, width: 260 }} />
         </div>
         <button type="button" onClick={handleEnregistrerRapide} style={{ padding: '8px 18px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 16, cursor: 'pointer', marginTop: 8 }}>Enregistrer infos rapide</button>
+        {erreurRapide && <div style={{ color: '#ef4444', fontWeight: 600, marginTop: 12 }}>{erreurRapide}</div>}
       </form>
       {/* Filtre par état du projet */}
       <div style={{ marginBottom: 18, display: 'flex', gap: 12, alignItems: 'center' }}>
