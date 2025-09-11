@@ -4,7 +4,7 @@
 import axios from 'axios';
 import Chart from 'chart.js/auto';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
-import { collection, doc, getDocs, query, updateDoc, where } from 'firebase/firestore';
+import { collection, doc, getDocs, updateDoc, query, where } from 'firebase/firestore';
 import { jsPDF } from 'jspdf';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -909,7 +909,6 @@ let priceBoxY = kitBoxY + kitBoxH; // Position intermédiaire, légèrement plus
   const [eco, setEco] = useState(0);
   const [rentabilite, setRentabilite] = useState([]);
   const [modeAugmentation, setModeAugmentation] = useState(true); // true = avec augmentation, false = sans
-  const [modeSansFinancement, setModeSansFinancement] = useState(false); // true = paiement comptant
   const [loadingPVGIS, setLoadingPVGIS] = useState(false);
   const [pvError, setPvError] = useState('');
 
@@ -982,7 +981,7 @@ let priceBoxY = kitBoxY + kitBoxH; // Position intermédiaire, légèrement plus
     }
   }, [prodMoyenneKwh, conso]);
 
-  // Calcul du tableau de rentabilité sur 20 ans avec +5%/an sur le prix EDF ou mode sans financement
+  // Calcul du tableau de rentabilité sur 20 ans avec +5%/an sur le prix EDF
   useEffect(() => {
     if (!prodMoyenneKwh || !conso || !prixNet) {
       setRentabilite([]);
@@ -991,45 +990,10 @@ let priceBoxY = kitBoxY + kitBoxH; // Position intermédiaire, légèrement plus
     const prixEdfBase = 0.25; // €/kWh (tarif Réunion 2025, MAJ)
     let prixEdf = prixEdfBase;
     const rows = [];
-    let prixRevente = 0.1741;
+    // Détermine le prix de revente selon le kit
+    let prixRevente = 0.1741; // défaut 3,6,9kW
     if (kit.startsWith('12KWh')) prixRevente = 0.0894;
-    if (modeSansFinancement) {
-      // Paiement comptant : tout payé la 1ère année, rien les suivantes
-      let surplus = prodMoyenneKwh && conso ? prodMoyenneKwh - Number(conso) : 0;
-      if (surplus < 0) surplus = 0;
-      const reventeEstimee = surplus ? (surplus * prixRevente).toFixed(0) : 0;
-      rows.push({
-        annee: currentYear,
-        coutEdf: Number((conso * prixEdf).toFixed(0)),
-        coutCentrale: prixNet,
-        prixEdfCts: (prixEdf * 100).toFixed(1),
-        reventeEstimee: Number(reventeEstimee),
-        diff: Number((conso * prixEdf).toFixed(0)) - prixNet,
-        mensualiteEdf: ((conso * prixEdf / 12).toFixed(2)),
-        mensualiteCentrale: 0
-      });
-      for (let i = 1; i < 20; i++) {
-        prixEdf *= modeAugmentation ? 1.05 : 1.0;
-        let diffValue = Number((conso * prixEdf).toFixed(0));
-        // Ajout de la prime à la différence la 2ème année
-        if (i === 1 && prime) {
-          diffValue += Number(prime);
-        }
-        rows.push({
-          annee: currentYear + i,
-          coutEdf: Number((conso * prixEdf).toFixed(0)),
-          coutCentrale: 0,
-          prixEdfCts: (prixEdf * 100).toFixed(1),
-          reventeEstimee: Number(reventeEstimee),
-          diff: diffValue,
-          mensualiteEdf: ((conso * prixEdf / 12).toFixed(2)),
-          mensualiteCentrale: 0
-        });
-      }
-      setRentabilite(rows);
-      return;
-    }
-    // Mode financement classique
+    // Nouvelle logique : remboursement anticipé de la prime à partir de la 2e année
     let montantRestant = montantFinance;
     let moisRestant = mois;
     let tauxRestant = tauxEffectif;
@@ -1039,11 +1003,16 @@ let priceBoxY = kitBoxY + kitBoxH; // Position intermédiaire, légèrement plus
       const annee = currentYear + i;
       const coutEdf = (conso * prixEdf).toFixed(0);
       let coutCentrale = 0;
+      // Mensualité EDF = coût EDF / 12
       const mensualiteEdf = (conso * prixEdf / 12).toFixed(2);
+      // Mensualité centrale = mensualitéCourante si remboursement, sinon 0
       let mensualiteCentrale = 0;
+      // Si encore en remboursement
       if (moisRestant > 0) {
+        // À partir de la 2e année, on déduit la prime du solde restant (une seule fois)
         if (i === 1 && prime && !primeUtilisee) {
           montantRestant = Math.max(0, montantRestant - prime);
+          // Recalcule la mensualité sur le solde restant et la durée restante
           const t = tauxRestant / 100 / 12;
           if (t === 0) {
             mensualiteCourante = moisRestant ? (montantRestant / moisRestant).toFixed(2) : '0.00';
@@ -1052,6 +1021,7 @@ let priceBoxY = kitBoxY + kitBoxH; // Position intermédiaire, légèrement plus
           }
           primeUtilisee = true;
         }
+        // Coût centrale = mensualité courante * 12, mais si moins de 12 mois restants, on ajuste
         if (moisRestant >= 12) {
           coutCentrale = (mensualiteCourante * 12).toFixed(0);
           mensualiteCentrale = mensualiteCourante;
@@ -1062,6 +1032,7 @@ let priceBoxY = kitBoxY + kitBoxH; // Position intermédiaire, légèrement plus
           moisRestant = 0;
         }
       }
+      // Revente estimée annuelle sur le surplus (production - conso)
       let surplus = prodMoyenneKwh && conso ? prodMoyenneKwh - Number(conso) : 0;
       if (surplus < 0) surplus = 0;
       const reventeEstimee = surplus ? (surplus * prixRevente).toFixed(0) : 0;
@@ -1078,7 +1049,7 @@ let priceBoxY = kitBoxY + kitBoxH; // Position intermédiaire, légèrement plus
       prixEdf *= modeAugmentation ? 1.05 : 1.0;
     }
     setRentabilite(rows);
-  }, [prodMoyenneKwh, conso, prixNet, mensualite, mois, montantFinance, tauxEffectif, prime, kit, modeAugmentation, modeSansFinancement]);
+  }, [prodMoyenneKwh, conso, prixNet, mensualite, mois, montantFinance, tauxEffectif, prime, kit, modeAugmentation]);
 
   // Requête PVGIS à chaque changement de coords ou kit
   useEffect(() => {
@@ -1378,7 +1349,7 @@ let priceBoxY = kitBoxY + kitBoxH; // Position intermédiaire, légèrement plus
         // Ajoute angle (inclinaison) et aspect (azimut) à la requête
         const azimut = orientationAzimut[orientation] ?? 180;
         const angle = inclinaison;
-        let url = `https://re.jrc.ec.europa.eu/api/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-SARAH3&peakpower=${kw}&loss=14&angle=${angle}&aspect=${azimut}&outputformat=json`;
+        let url = `https://re.jrc.ec.europa.eu/api/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-ERA5&peakpower=${kw}&loss=14&angle=${angle}&aspect=${azimut}&outputformat=json`;
         let proxyUrl = `https://pvgis-proxy-next-clean.vercel.app/api/pvgis?url=${encodeURIComponent(url)}`;
         let res, kwh;
         console.log('PVGIS URL:', url);
@@ -1403,7 +1374,7 @@ let priceBoxY = kitBoxY + kitBoxH; // Position intermédiaire, légèrement plus
           setLoadingPVGIS(false);
         } catch (err) {
           // Si PVcalc échoue, tente v5_2/PVcalc
-          url = `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-SARAH3&peakpower=${kw}&loss=14&angle=${angle}&aspect=${azimut}&outputformat=json`;
+          url = `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-ERA5&peakpower=${kw}&loss=14&angle=${angle}&aspect=${azimut}&outputformat=json`;
           proxyUrl = `https://pvgis-proxy-next-clean.vercel.app/api/pvgis?url=${encodeURIComponent(url)}`;
           console.log('PVGIS fallback URL:', url);
           try {
@@ -1818,12 +1789,7 @@ let priceBoxY = kitBoxY + kitBoxH; // Position intermédiaire, légèrement plus
               </thead>
               <tbody>
                 {rentabilite && rentabilite.length > 0 ? rentabilite.map((row, i) => {
-                  let diff = row.coutEdf - (row.coutCentrale || 0);
-                  let diffDisplay = diff.toFixed(2) + ' €';
-                  // Si mode sans financement et 2ème année, ajoute la prime dans l'affichage
-                  if (modeSansFinancement && i === 1 && prime) {
-                    diffDisplay = diff.toFixed(2) + ' €' + ' + ' + Number(prime).toLocaleString() + ' € (prime)';
-                  }
+                  const diff = row.coutEdf - (row.coutCentrale || 0);
                   return (
                     <tr key={i} style={{ background: i % 2 === 0 ? '#f1f5f9' : '#fff' }}>
                       <td style={{ padding: 8 }}>{row.annee}</td>
@@ -1833,7 +1799,7 @@ let priceBoxY = kitBoxY + kitBoxH; // Position intermédiaire, légèrement plus
                       <td style={{ padding: 8 }}>{row.coutCentrale} €</td>
                       <td style={{ padding: 8, color: '#2563eb', fontWeight: 900 }}>{row.mensualiteCentrale} €</td>
                       <td style={{ padding: 8, color: '#bfa100', fontWeight: 900 }}>{row.reventeEstimee} €</td>
-                      <td style={{ padding: 8, color: diff < 0 ? '#dc2626' : '#10b981', fontWeight: 700 }}>{diffDisplay}</td>
+                      <td style={{ padding: 8, color: diff < 0 ? '#dc2626' : '#10b981', fontWeight: 700 }}>{diff.toFixed(2)} €</td>
                     </tr>
                   );
                 }) : <tr><td colSpan={8} style={{ textAlign: 'center', padding: 12 }}>Aucune donnée</td></tr>}
@@ -1886,21 +1852,6 @@ let priceBoxY = kitBoxY + kitBoxH; // Position intermédiaire, légèrement plus
           position: 'relative',
           overflow: 'hidden'
         }}>
-          <button
-            onClick={() => setModeSansFinancement(v => !v)}
-            style={{
-              background: modeSansFinancement ? '#10b981' : '#e5e7eb',
-              color: modeSansFinancement ? '#fff' : '#222',
-              border: 'none',
-              borderRadius: 8,
-              padding: '10px 24px',
-              fontWeight: 800,
-              fontSize: 16,
-              cursor: 'pointer',
-              marginBottom: 18,
-              boxShadow: modeSansFinancement ? '0 2px 8px #a7f3d0' : 'none'
-            }}
-          >{modeSansFinancement ? 'Mode : Sans financement (comptant)' : 'Activer : Sans financement (comptant)'}</button>
           <h3 style={{
             color: '#3730a3',
             fontWeight: 900,

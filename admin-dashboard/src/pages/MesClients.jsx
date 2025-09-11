@@ -276,8 +276,12 @@ export default function MesClients() {
     setClients([...refreshed].reverse());
   };
 
+  // --- Ajout état pour message d'erreur ---
+  const [ajoutErreur, setAjoutErreur] = useState('');
+
   const handleAjoutClient = async (e) => {
     e.preventDefault();
+    setAjoutErreur('');
     if (nouveauClient.nom && nouveauClient.prenom && nouveauClient.adresse && nouveauClient.ville && nouveauClient.email && nouveauClient.telephone && user) {
       let emailManagerToUse = user.email;
       let debugManagerEmail = '';
@@ -289,6 +293,10 @@ export default function MesClients() {
           const userData = userSnap.docs[0].data();
           if (userData.managerEmail) managerEmail = userData.managerEmail;
           debugManagerEmail = userData.managerEmail || '';
+        }
+        if (!debugManagerEmail) {
+          setAjoutErreur("Aucun manager n'est attribué à ce commercial. Veuillez contacter un administrateur.");
+          return;
         }
         emailManagerToUse = managerEmail;
       }
@@ -321,6 +329,8 @@ export default function MesClients() {
       const snap = await getDocs(q);
       const refreshed = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       setClients([...refreshed].reverse());
+    } else {
+      setAjoutErreur('Merci de remplir tous les champs obligatoires.');
     }
   };
 
@@ -613,6 +623,7 @@ export default function MesClients() {
           Ajouter
         </button>
       </form>
+      {ajoutErreur && <div style={{ color: '#ef4444', fontWeight: 600, marginBottom: 12 }}>{ajoutErreur}</div>}
       {/* Formulaire simplifié pour prise rapide au téléphone */}
       <form style={{ marginBottom: 32, background: '#f8fafc', padding: 18, borderRadius: 8, boxShadow: '0 2px 8px #2563eb22', maxWidth: 700 }}>
         <h3 style={{ marginBottom: 12, color: '#2563eb' }}>Prise rapide infos client (téléphone)</h3>
@@ -729,7 +740,7 @@ export default function MesClients() {
           <div>
             <label style={{ fontWeight: 600 }}>Manager :</label><br />
             <select name="emailManager" value={formRapide.emailManager || user?.email} onChange={handleChangeFormRapide} style={{ padding: 8, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 16, width: 220 }}>
-              {managers.map(m => (
+              {managers.filter(m => userRole !== 'commercial' || m.email !== user.email).map(m => (
                 <option key={m.email} value={m.email}>{(m.nom || '') + ' ' + (m.prenom || '')} ({m.email})</option>
               ))}
             </select>

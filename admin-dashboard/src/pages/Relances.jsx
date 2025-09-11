@@ -12,7 +12,7 @@ export default function Relances() {
   const [userRole, setUserRole] = useState(null);
   const [loading, setLoading] = useState(true);
   const [relances, setRelances] = useState([]);
-  const [relanceFilter, setRelanceFilter] = useState('jour'); // 'jour' ou 'avenir'
+  const [relanceFilter, setRelanceFilter] = useState('jour'); // 'jour', 'avenir', 'enAttente'
   const [editId, setEditId] = useState(null);
   const [editDate, setEditDate] = useState('');
   const [editComment, setEditComment] = useState('');
@@ -119,17 +119,17 @@ export default function Relances() {
   // Filtres relances
   const today = new Date();
   const todayStr = today.toISOString().slice(0, 10);
-  const relancesDuJour = relances.filter(r => r.dateRelance === todayStr);
-  const relancesFiltrees = relances.filter(r => {
-    // On force le format AAAA-MM-JJ pour la comparaison
-    const relanceDate = r.dateRelance;
-    if (relanceFilter === 'jour') {
-      return relanceDate === todayStr;
-    } else {
-      // Relances à venir = date strictement supérieure à aujourd'hui
-      return relanceDate > todayStr;
-    }
-  });
+  // Relances du jour ET non effectuées
+  const relancesDuJour = relances.filter(r => r.dateRelance === todayStr && !r.effectuee);
+  // Relances à venir (date future)
+  const relancesAVenir = relances.filter(r => r.dateRelance > todayStr && !r.effectuee);
+  // Relances en attente = toutes les relances passées ou du jour non effectuées
+  const relancesEnAttente = relances.filter(r => r.dateRelance <= todayStr && !r.effectuee);
+  // Relances filtrées selon le filtre sélectionné
+  let relancesFiltrees = [];
+  if (relanceFilter === 'jour') relancesFiltrees = relancesDuJour;
+  else if (relanceFilter === 'avenir') relancesFiltrees = relancesAVenir;
+  else if (relanceFilter === 'enAttente') relancesFiltrees = relancesEnAttente;
 
   // Met à jour le localStorage pour la pastille header
   useEffect(() => {
@@ -138,6 +138,12 @@ export default function Relances() {
   }, [relancesDuJour.length]);
 
   if (loading) return <div style={{ padding: 40 }}>Chargement...</div>;
+
+  // Ajout fonction pour cocher/décocher une relance comme effectuée
+  const handleToggleEffectuee = async (relance) => {
+    await updateDoc(doc(db, 'relances', relance.id), { effectuee: !relance.effectuee });
+    refreshRelances();
+  };
 
   return (
     <div style={{ padding: 40 }}>
@@ -191,6 +197,27 @@ export default function Relances() {
           )}
         </button>
         <button onClick={() => setRelanceFilter('avenir')} style={{ padding: '8px 18px', background: relanceFilter === 'avenir' ? '#2563eb' : '#e5e7eb', color: relanceFilter === 'avenir' ? '#fff' : '#334155', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>Relances à venir</button>
+        <button onClick={() => setRelanceFilter('enAttente')} style={{ padding: '8px 18px', background: relanceFilter === 'enAttente' ? '#ef4444' : '#e5e7eb', color: relanceFilter === 'enAttente' ? '#fff' : '#334155', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>Relances en attente
+          {relancesEnAttente.length > 0 && (
+            <span style={{
+              position: 'absolute',
+              top: -8,
+              right: -8,
+              background: '#ef4444',
+              color: '#fff',
+              borderRadius: '50%',
+              minWidth: 20,
+              height: 20,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontWeight: 700,
+              fontSize: 13,
+              boxShadow: '0 2px 8px #ef444488',
+              zIndex: 2
+            }}>{relancesEnAttente.length}</span>
+          )}
+        </button>
       </div>
       <ul style={{ listStyle: 'none', padding: 0 }}>
         {relancesFiltrees.length === 0 && (
@@ -222,9 +249,12 @@ export default function Relances() {
                   <div style={{ color: '#2563eb', fontWeight: 500 }}>Date de relance : {r.dateRelance}</div>
                   <div style={{ fontSize: 15, margin: '6px 0' }}>Commentaire : {r.commentaire}</div>
                   <div style={{ color: '#64748b', fontSize: 14 }}>Créée par : {r.creePar}</div>
-                  <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+                  <div style={{ display: 'flex', gap: 10, marginTop: 8, alignItems: 'center' }}>
                     <button onClick={() => handleEditClick(r)} style={{ padding: '6px 14px', background: '#6366f1', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Modifier</button>
                     <button onClick={() => handleDelete(r)} style={{ padding: '6px 14px', background: '#ef4444', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}>Supprimer</button>
+                    <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontWeight: 600, color: '#10b981', cursor: 'pointer' }}>
+                      <input type="checkbox" checked={!!r.effectuee} onChange={() => handleToggleEffectuee(r)} /> Effectuée
+                    </label>
                   </div>
                 </>
               )}
