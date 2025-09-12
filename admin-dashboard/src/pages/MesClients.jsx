@@ -474,11 +474,20 @@ export default function MesClients() {
     setShowEtatProjetId(clientId);
     const client = clients.find(c => c.id === clientId);
     const firestoreEtat = client?.etatProjet || {};
-    // Normalise toutes les valeurs (boolean ou string)
+    // Normalise toutes les valeurs (boolean ou string), mais conserve les dates si présentes
     const normalizedEtat = Object.keys(firestoreEtat).length > 0
-      ? Object.fromEntries(
-          Object.entries(firestoreEtat).map(([k, v]) => [k, v === true || v === 'true' || v === 1 || v === '1'])
-        )
+      ? {
+          ...firestoreEtat,
+          rdvFait: firestoreEtat.rdvFait === true || firestoreEtat.rdvFait === 'true' || firestoreEtat.rdvFait === 1 || firestoreEtat.rdvFait === '1',
+          attente: firestoreEtat.attente === true || firestoreEtat.attente === 'true' || firestoreEtat.attente === 1 || firestoreEtat.attente === '1',
+          vendu: firestoreEtat.vendu === true || firestoreEtat.vendu === 'true' || firestoreEtat.vendu === 1 || firestoreEtat.vendu === '1',
+          nonVendu: firestoreEtat.nonVendu === true || firestoreEtat.nonVendu === 'true' || firestoreEtat.nonVendu === 1 || firestoreEtat.nonVendu === '1',
+          declarationEnCours: firestoreEtat.declarationEnCours === true || firestoreEtat.declarationEnCours === 'true' || firestoreEtat.declarationEnCours === 1 || firestoreEtat.declarationEnCours === '1',
+          declarationValidee: firestoreEtat.declarationValidee === true || firestoreEtat.declarationValidee === 'true' || firestoreEtat.declarationValidee === 1 || firestoreEtat.declarationValidee === '1',
+          installe: firestoreEtat.installe === true || firestoreEtat.installe === 'true' || firestoreEtat.installe === 1 || firestoreEtat.installe === '1',
+          rdvPrisDate: firestoreEtat.rdvPrisDate || '',
+          rdvFaitDate: firestoreEtat.rdvFaitDate || '',
+        }
       : {
           rdvFait: false,
           attente: false,
@@ -486,7 +495,9 @@ export default function MesClients() {
           nonVendu: false,
           declarationEnCours: false,
           declarationValidee: false,
-          installe: false
+          installe: false,
+          rdvPrisDate: '',
+          rdvFaitDate: '',
         };
     setEtatProjet(prev => ({
       ...prev,
@@ -505,13 +516,19 @@ export default function MesClients() {
     }));
   };
 
-  // Handler pour sauvegarder l'état projet (à adapter si tu veux persister dans Firestore)
+  // Handler pour sauvegarder l'état projet (corrigé pour garantir la sauvegarde des dates)
   const handleSaveEtatProjet = async (clientId) => {
-    // Met à jour etatProjet
-    await updateDoc(doc(db, 'clients', clientId), { etatProjet: etatProjet[clientId] });
+    // On s'assure que les dates sont bien présentes dans l'objet à sauvegarder
+    const etat = etatProjet[clientId] || {};
+    const toSave = {
+      ...etat,
+      rdvPrisDate: etat.rdvPrisDate || '',
+      rdvFaitDate: etat.rdvFaitDate || '',
+    };
+    await updateDoc(doc(db, 'clients', clientId), { etatProjet: toSave });
     // Si "vendu" est coché, met le statut principal à "Vendu" et ajoute la date de vente UNIQUEMENT si elle n'existe pas déjà
     const client = clients.find(c => c.id === clientId);
-    if (etatProjet[clientId]?.vendu) {
+    if (etat.vendu) {
       const dateVente = client?.dateVente || new Date().toISOString();
       await updateDoc(doc(db, 'clients', clientId), {
         statut: 'Vendu',
@@ -1179,6 +1196,7 @@ export default function MesClients() {
                           width: '100%',
                           background: '#fff',
                           borderTop: '1px solid #e5e7eb',
+                         
                           padding: '18px 24px',
                           display: 'flex',
                           gap: 12,
