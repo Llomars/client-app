@@ -820,7 +820,10 @@ export default function MesClients() {
         {(
           userRole === 'commercial'
             ? clients.filter(c => c.emailCommercial === user.email)
-            : clients.filter(c => activeTab ? c.emailManager === activeTab : true)
+            : clients.filter(c => activeTab
+                ? c.emailCommercial === activeTab
+                : c.emailManager === user.email && c.emailCommercial === user.email
+              )
         )
         // Filtrage par état du projet
         .filter(client => {
@@ -840,7 +843,10 @@ export default function MesClients() {
         {(
           userRole === 'commercial'
             ? clients.filter(c => c.emailCommercial === user.email)
-            : clients.filter(c => activeTab ? c.emailManager === activeTab : true)
+            : clients.filter(c => activeTab
+                ? c.emailCommercial === activeTab
+                : c.emailManager === user.email && c.emailCommercial === user.email
+              )
         )
         // Filtrage par état du projet
         .filter(client => {
@@ -1348,6 +1354,17 @@ export default function MesClients() {
                     }}>
                       <div style={{ background: '#fff', borderRadius: 12, padding: 32, minWidth: 320, boxShadow: '0 2px 16px #0002', position: 'relative' }}>
                         <h3 style={{ marginBottom: 18, color: '#2563eb' }}>État du projet</h3>
+                        {/* Champ date pour RDV pris tout en haut */}
+                        <div style={{ marginBottom: 18 }}>
+                          <span style={{ fontWeight: 500, color: '#64748b', marginRight: 8 }}>Date RDV pris :</span>
+                          <input
+                            type="date"
+                            value={etatProjet[showEtatProjetId]?.rdvPrisDate ? etatProjet[showEtatProjetId].rdvPrisDate.substring(0,10) : ''}
+                            onChange={e => handleChangeEtatProjet('rdvPrisDate', e.target.value)}
+                            style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }}
+                          />
+                        </div>
+                        {/* Liste des statuts */}
                         {['rdvFait','attente','vendu','nonVendu','declarationEnCours','declarationValidee','installe'].map(key => (
                           <div key={key} style={{ marginBottom: 10 }}>
                             <label style={{ fontWeight: 600, marginRight: 12 }}>
@@ -1360,6 +1377,15 @@ export default function MesClients() {
                                key === 'declarationValidee' ? 'Déclaration validée' :
                                key === 'installe' ? 'Installé' : key}
                             </label>
+                            {/* Champ date pour RDV fait */}
+                            {key === 'rdvFait' && etatProjet[showEtatProjetId]?.[key] && (
+                              <input
+                                type="date"
+                                value={etatProjet[showEtatProjetId]?.rdvFaitDate ? etatProjet[showEtatProjetId].rdvFaitDate.substring(0,10) : ''}
+                                onChange={e => handleChangeEtatProjet('rdvFaitDate', e.target.value)}
+                                style={{ marginLeft: 16, padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }}
+                              />
+                            )}
                           </div>
                         ))}
                         <div style={{ display: 'flex', gap: 16, marginTop: 24 }}>
@@ -1384,6 +1410,17 @@ export default function MesClients() {
         }}>
           <div style={{ background: '#fff', borderRadius: 12, padding: 32, minWidth: 320, boxShadow: '0 2px 16px #0002', position: 'relative' }}>
             <h3 style={{ marginBottom: 18, color: '#2563eb' }}>État du projet</h3>
+            {/* Champ date pour RDV pris tout en haut */}
+            <div style={{ marginBottom: 18 }}>
+              <span style={{ fontWeight: 500, color: '#64748b', marginRight: 8 }}>Date RDV pris :</span>
+              <input
+                type="date"
+                value={etatProjet[showEtatProjetId]?.rdvPrisDate ? etatProjet[showEtatProjetId].rdvPrisDate.substring(0,10) : ''}
+                onChange={e => handleChangeEtatProjet('rdvPrisDate', e.target.value)}
+                style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }}
+              />
+            </div>
+            {/* Liste des statuts */}
             {['rdvFait','attente','vendu','nonVendu','declarationEnCours','declarationValidee','installe'].map(key => (
               <div key={key} style={{ marginBottom: 10 }}>
                 <label style={{ fontWeight: 600, marginRight: 12 }}>
@@ -1396,6 +1433,15 @@ export default function MesClients() {
                    key === 'declarationValidee' ? 'Déclaration validée' :
                    key === 'installe' ? 'Installé' : key}
                 </label>
+                {/* Champ date pour RDV fait */}
+                {key === 'rdvFait' && etatProjet[showEtatProjetId]?.[key] && (
+                  <input
+                    type="date"
+                    value={etatProjet[showEtatProjetId]?.rdvFaitDate ? etatProjet[showEtatProjetId].rdvFaitDate.substring(0,10) : ''}
+                    onChange={e => handleChangeEtatProjet('rdvFaitDate', e.target.value)}
+                    style={{ marginLeft: 16, padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }}
+                  />
+                )}
               </div>
             ))}
             <div style={{ display: 'flex', gap: 16, marginTop: 24 }}>

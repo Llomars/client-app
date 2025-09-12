@@ -601,22 +601,27 @@ function EquipeStatsSection() {
       }
       return sum;
     }, 0);
-    // Utilise les stats Firestore pour RDV pris/fait
-    const rdvPris = statsManager.nbRdvPris || 0;
-    const rdvFaits = statsManager.nbRdvFait || 0;
     // Ventes (toujours calculé à partir des clients)
     const ventes = equipeClients.filter(c => {
-      const d = c.dateVente ? new Date(c.dateVente) : null;
-      return d && d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear && c.statut === 'Vendu';
+      const d = new Date(c.dateVente);
+      return d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear && c.statut === 'Vendu';
     }).length;
-    // RDV faits du mois : clients dont etatProjet === 'RDV fait' et dateEtatProjet dans le mois/année sélectionnés
+    // RDV faits du mois : clients dont etatProjet.rdvFaitDate dans le mois/année sélectionnés
     const rdvFaitsMois = equipeClients.filter(c => {
-      if (c.etatProjet !== 'RDV fait') return false;
-      if (!c.dateEtatProjet) return false;
-      const d = new Date(c.dateEtatProjet);
+      const rdvDate = getRdvFaitDate(c);
+      if (!rdvDate) return false;
+      const d = new Date(rdvDate);
       return d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
     }).length;
-    return { ca, rdvPris, rdvFaits, ventes, rdvFaitsMois, commerciaux: statsCommerciaux, equipe: equipeClients };
+    // RDV pris du mois : clients dont etatProjet.rdvPrisDate dans le mois/année sélectionnés
+    const rdvPrisMois = equipeClients.filter(c => {
+      const rdvDate = c.etatProjet && c.etatProjet.rdvPrisDate;
+      if (!rdvDate) return false;
+      const d = new Date(rdvDate);
+      return d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear;
+    }).length;
+    // --- Correction ici : on retourne les stats calculées dynamiquement ---
+    return { ca, rdvPris: rdvPrisMois, rdvFaits: rdvFaitsMois, ventes, rdvFaitsMois, rdvPrisMois, commerciaux: statsCommerciaux, equipe: equipeClients };
   };
 
   // Section détail de la journée en cours (filtrable)
@@ -636,12 +641,11 @@ function EquipeStatsSection() {
         {managers.map(email => {
           const stats = getEquipeStats(email);
           const managerStats = statsVendeurs.find(s => s.email === email && s.mois === `${selectedYear}-${String(selectedMonth).padStart(2, '0')}`) || {};
-          // RDV faits du jour : clients dont etatProjet === 'RDV fait' et dateEtatProjet == selectedDay
+          // RDV faits du jour : clients dont etatProjet.rdvFaitDate == selectedDay
           const rdvFaitsJour = stats.equipe.filter(c => {
-            if (c.etatProjet !== 'RDV fait') return false;
-            if (!c.dateEtatProjet) return false;
-            const d = new Date(c.dateEtatProjet);
-            return d.toISOString().slice(0, 10) === selectedDay;
+            const rdvDate = getRdvFaitDate(c);
+            if (!rdvDate) return false;
+            return new Date(rdvDate).toISOString().slice(0, 10) === selectedDay;
           }).length;
           // Ventes du jour (inchangé)
           const ventesJour = stats.equipe.filter(c => {
@@ -664,7 +668,10 @@ function EquipeStatsSection() {
                 <div style={{ fontSize: 14, color: '#64748b' }}>Aucun commercial attribué</div>
               ) : stats.commerciaux.map(com => {
                 // RDV faits du jour pour chaque commercial
-                const rdvFaitsComJour = stats.equipe.filter(c => c.etatProjet === 'RDV fait' && c.emailCommercial === com.email && c.dateEtatProjet && (new Date(c.dateEtatProjet)).toISOString().slice(0, 10) === selectedDay).length;
+                const rdvFaitsComJour = stats.equipe.filter(c => {
+                  const rdvDate = getRdvFaitDate(c);
+                  return rdvDate && c.emailCommercial === com.email && new Date(rdvDate).toISOString().slice(0, 10) === selectedDay;
+                }).length;
                 const ventesComJour = stats.equipe.filter(c => c.statut === 'Vendu' && c.emailCommercial === com.email && c.dateVente && (new Date(c.dateVente)).toISOString().slice(0, 10) === selectedDay).length;
                 return (
                   <div key={com.email} style={{ marginBottom: 10, padding: '8px 12px', background: '#fff', borderRadius: 8 }}>
@@ -811,4 +818,12 @@ function EquipeStatsSection() {
       )}
     </>
   );
+}
+
+// --- Utilitaire pour récupérer la date réelle du RDV fait ---
+function getRdvFaitDate(client) {
+  // Prend la date du champ etatProjet.rdvFaitDate si dispo, sinon fallback éventuel
+  if (client.etatProjet && client.etatProjet.rdvFaitDate) return client.etatProjet.rdvFaitDate;
+  if (client.rdvFaitDate) return client.rdvFaitDate;
+  return null;
 }

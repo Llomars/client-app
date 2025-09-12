@@ -16,6 +16,7 @@ export default function Relances() {
   const [editId, setEditId] = useState(null);
   const [editDate, setEditDate] = useState('');
   const [editComment, setEditComment] = useState('');
+  const [relanceErreur, setRelanceErreur] = useState('');
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -78,20 +79,30 @@ export default function Relances() {
   }
 
   const handleSaveRelance = async () => {
-    if (!selectedClient || !dateRelance) return;
-    await addDoc(collection(db, 'relances'), {
-      clientId: selectedClient,
-      dateRelance,
-      commentaire,
-      creePar: user?.email,
-      creeLe: new Date().toISOString(),
-    });
-    alert('Relance enregistrée !');
-    setSelectedClient(null);
-    setDateRelance('');
-    setCommentaire('');
-    // Ajout : rafraîchir la liste après création
-    refreshRelances();
+    setRelanceErreur('');
+    if (!selectedClient || !dateRelance) {
+      setRelanceErreur('Merci de sélectionner un client et une date.');
+      return;
+    }
+    try {
+      await addDoc(collection(db, 'relances'), {
+        clientId: selectedClient,
+        dateRelance,
+        commentaire,
+        creePar: user?.email,
+        creeLe: new Date().toISOString(),
+      });
+      alert('Relance enregistrée !');
+      setSelectedClient(null);
+      setDateRelance('');
+      setCommentaire('');
+      refreshRelances();
+    } catch (err) {
+      setRelanceErreur("Erreur lors de l'ajout de la relance : " + (err.message || err));
+      setSelectedClient(null);
+      setDateRelance('');
+      setCommentaire('');
+    }
   };
 
   // Edition relance
@@ -171,6 +182,8 @@ export default function Relances() {
       <button onClick={() => navigate(-1)} style={{ marginLeft: 16, padding: '8px 18px', background: '#e5e7eb', color: '#334155', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 16, cursor: 'pointer' }}>
         Retour
       </button>
+      {/* Affichage du message d'erreur relance */}
+      {relanceErreur && <div style={{ color: '#ef4444', fontWeight: 600, marginBottom: 12 }}>{relanceErreur}</div>}
       <hr style={{ margin: '32px 0' }} />
       <h2>Liste des relances</h2>
       <div style={{ marginBottom: 18, display: 'flex', gap: 12 }}>
