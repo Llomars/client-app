@@ -18,6 +18,7 @@ import SAV from './pages/SAV';
 import Logistique from './pages/Logistique';
 import Calculateur from './pages/Calculateur';
 import Relances from './pages/Relances';
+import FaireProposition from './pages/FaireProposition';
 
 console.log('🔍 Performance.jsx chargé');
 
@@ -42,6 +43,7 @@ export default function App() {
         <Route path="/logistique" element={<Logistique />} />
         <Route path="/calculateur" element={<Calculateur />} />
         <Route path="/relances" element={<Relances />} />
+        <Route path="/faire-proposition" element={<FaireProposition />} />
       </Routes>
     </Router>
   );

@@ -196,6 +196,23 @@ export default function Header() {
               }}>{relancesJourCount}</span>
             )}
           </Link>
+          <Link
+            to="/faire-proposition"
+            style={{
+              background: '#4ade80',
+              padding: '8px 16px',
+              borderRadius: '8px',
+              textDecoration: 'none',
+              color: '#fff',
+              fontWeight: '500',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+          >
+            <span role="img" aria-label="proposition" style={{ fontSize: 20 }}>💼</span>
+            Faire une proposition
+          </Link>
 
           <button
             onClick={handleLogout}
