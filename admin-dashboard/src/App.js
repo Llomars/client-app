@@ -36,7 +36,6 @@ export default function App() {
         <Route path="/stats" element={<Stats />} />
         <Route path="/user-management" element={<UserManagement />} />
         <Route path="/plannings" element={<Plannings />} />
-        <Route path="/etude-perso" element={<EtudePerso />} />
         <Route path="/sav" element={<SAV />} />
         <Route path="/logistique" element={<Logistique />} />
         <Route path="/calculateur" element={<Calculateur />} />
