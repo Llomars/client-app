@@ -1,6 +1,6 @@
 import React from 'react';
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom';
-import Header from './components/Header.js';
+import Header from './components/Header.jsx';
 import Home from './pages/Home.js';
 import Clients from './pages/Clients.js';
 import CommercialDashboard from './pages/CommercialDashboard.js';
