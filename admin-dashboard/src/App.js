@@ -1,24 +1,22 @@
 import React from 'react';
 import { Route, BrowserRouter as Router, Routes } from 'react-router-dom';
-import Header from './components/Header';
-import Home from './pages/Home';
-import Clients from './pages/Clients';
-import CommercialDashboard from './pages/CommercialDashboard';
-import MesClients from './pages/MesClients';
-import Parrainages from './pages/Parrainages';
-import Performance from './pages/Performance';
-import Profile from './pages/Profile';
-import Register from './pages/Register';
-import Stats from './pages/Stats';
-import UserManagement from './pages/UserManagement';
-import Plannings from './pages/plannings';
-import EtudePerso from './pages/etude-perso';
-
-import SAV from './pages/SAV';
-import Logistique from './pages/Logistique';
-import Calculateur from './pages/Calculateur';
-import Relances from './pages/Relances';
-import FaireProposition from './pages/FaireProposition';
+import Header from './components/Header.js';
+import Home from './pages/Home.js';
+import Clients from './pages/Clients.js';
+import CommercialDashboard from './pages/CommercialDashboard.js';
+import MesClients from './pages/MesClients.js';
+import Parrainages from './pages/Parrainages.js';
+import Performance from './pages/Performance.js';
+import Profile from './pages/Profile.js';
+import Register from './pages/Register.js';
+import Stats from './pages/Stats.js';
+import UserManagement from './pages/UserManagement.js';
+import Plannings from './pages/plannings.js';
+import SAV from './pages/SAV.js';
+import Logistique from './pages/Logistique.js';
+import Calculateur from './pages/Calculateur.js';
+import Relances from './pages/Relances.js';
+import FaireProposition from './pages/FaireProposition.js';
 
 console.log('🔍 Performance.jsx chargé');
 

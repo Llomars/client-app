@@ -5,16 +5,16 @@ import { createAppContainer } from 'react-navigation';
 import { createStackNavigator } from 'react-navigation-stack';
 
 // ✅ Écrans existants
-import Avis from './avis';
-import Dashboard from './dashboard';
-import Index from './index'; // ton écran d'accueil avec tous tes boutons
-import Parrainage from './parrainage';
-import Sav from './sav';
+import Avis from './avis.js';
+import Dashboard from './dashboard.js';
+import Index from './index.js'; // ton écran d'accueil avec tous tes boutons
+import Parrainage from './parrainage.js';
+import Sav from './sav.js';
 
 // ✅ Nouveaux écrans pour le Profil Commercial
-import CommercialDashboard from './pages/CommercialDashboard';
-import Profile from './pages/Profile'; // Assure-toi que ton Profile.jsx est dans app/pages/Profile.jsx
-import Register from './pages/Register';
+import CommercialDashboard from './pages/CommercialDashboard.js';
+import Profile from './pages/Profile.js'; // Assure-toi que ton Profile.jsx est dans app/pages/Profile.jsx
+import Register from './pages/Register.js';
 
 // ✅ Création du Stack Navigator
 const AppNavigator = createStackNavigator(
