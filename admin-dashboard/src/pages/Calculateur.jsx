@@ -1741,13 +1741,16 @@ function Calculateur() {
 
   // Calcul du totalDiff sur 20 ans (différence annuelle cumulée)
   const diffArray = rentabilite
-    ? rentabilite.map((row) => row.coutEdf - (row.coutCentrale || 0))
+    ? rentabilite.map(
+        (row) =>
+          row.coutEdf - (row.coutCentrale || 0) - ((consoNuitJour > capaciteBatterie ? (consoNuitJour - capaciteBatterie) * 365 : 0) * 0.25) + (row.reventeEstimee || 0)
+      )
     : [];
   const totalDiff = diffArray.reduce((acc, v) => acc + v, 0);
   // Calcul de l'année de rentabilité (première année où diff > 0)
-  const anneeRentable = rentabilite.find(
-    (row) => row.coutEdf - (row.coutCentrale || 0) > 0
-  );
+  const anneeRentableIndex = diffArray.findIndex((v) => v > 0);
+  const anneeRentable =
+    anneeRentableIndex !== -1 ? rentabilite[anneeRentableIndex] : null;
   const nbAnneesRentable = anneeRentable
     ? anneeRentable.annee - currentYear + 1
     : null;
@@ -2970,7 +2973,7 @@ function Calculateur() {
                           : 0;
                       let coutResiduelEDF = residuelEDFAn * prixEdfAnnee;
                       const diff =
-                        row.coutEdf - (row.coutCentrale || 0) - coutResiduelEDF;
+                        row.coutEdf - (row.coutCentrale || 0) - coutResiduelEDF + (row.reventeEstimee || 0);
                       return (
                         <tr
                           key={i}
