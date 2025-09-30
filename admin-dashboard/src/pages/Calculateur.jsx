@@ -1743,7 +1743,13 @@ function Calculateur() {
   const diffArray = rentabilite
     ? rentabilite.map(
         (row) =>
-          row.coutEdf - (row.coutCentrale || 0) - ((consoNuitJour > capaciteBatterie ? (consoNuitJour - capaciteBatterie) * 365 : 0) * 0.25) + (row.reventeEstimee || 0)
+          row.coutEdf -
+          (row.coutCentrale || 0) -
+          (consoNuitJour > capaciteBatterie
+            ? (consoNuitJour - capaciteBatterie) * 365
+            : 0) *
+            0.25 +
+          (row.reventeEstimee || 0)
       )
     : [];
   const totalDiff = diffArray.reduce((acc, v) => acc + v, 0);
@@ -2973,7 +2979,10 @@ function Calculateur() {
                           : 0;
                       let coutResiduelEDF = residuelEDFAn * prixEdfAnnee;
                       const diff =
-                        row.coutEdf - (row.coutCentrale || 0) - coutResiduelEDF + (row.reventeEstimee || 0);
+                        row.coutEdf -
+                        (row.coutCentrale || 0) -
+                        coutResiduelEDF +
+                        (row.reventeEstimee || 0);
                       return (
                         <tr
                           key={i}

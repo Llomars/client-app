@@ -1,11 +1,169 @@
-import { getApp } from 'firebase/app';
+import React, { useState, useEffect, useCallback } from 'react';
 import { getAuth } from 'firebase/auth';
-import { addDoc, collection, getDocs, getFirestore } from 'firebase/firestore';
-import { useCallback, useEffect, useState } from 'react';
+import { getFirestore, getDocs, collection, addDoc } from 'firebase/firestore';
+import { getApp } from 'firebase/app';
 import * as XLSX from 'xlsx';
+
+// Fonction utilitaire pour générer les tags visuels (données + design)
+  function getVisualTags(etude) {
+    // Calculs pour tags
+    const primeValueNum = Number(etude.primeEDF || etude.prime || 0);
+    let anneeRentable = null;
+    let gainTotal20ans = null;
+    Object.entries(etude).forEach(([key, value]) => {
+      if (
+        Array.isArray(value) &&
+        value.length > 0 &&
+        typeof value[0] === 'object' &&
+        value[0] !== null &&
+        ('annee' in value[0] || 'coutEdf' in value[0] || 'mensualiteEdf' in value[0])
+      ) {
+        let cumul = 0;
+        for (let i = 0; i < value.length; i++) {
+          const diff = Number(value[i].diff) || 0;
+          const revente = Number(value[i].reventeEstimee) || 0;
+          const total = diff + revente;
+          if (total < 0) cumul++;
+          else break;
+        }
+        anneeRentable = cumul + 1;
+        const totalDiff = value.reduce((sum, row) => sum + (Number(row.diff) || 0), 0);
+        const totalRevente = value.reduce((sum, row) => sum + (Number(row.reventeEstimee) || 0), 0);
+        gainTotal20ans = (totalDiff + totalRevente).toLocaleString() + ' €';
+      }
+    });
+    return [
+      {
+        label: 'Production annuelle',
+        value: etude.prodMoyenneKwh ? etude.prodMoyenneKwh + ' kWh/an' : '-',
+        color: 'linear-gradient(90deg,#2563eb 60%,#60a5fa 100%)',
+        icon: '⚡',
+        valueColor: '#fff',
+        shadow: '0 2px 12px #2563eb33',
+      },
+      {
+        label: 'Année de rentabilité',
+        value: anneeRentable || etude.amortissement || '-',
+        color: 'linear-gradient(90deg,#bfa100 60%,#fbbf24 100%)',
+        icon: '⏳',
+        valueColor: '#fff',
+        shadow: '0 2px 12px #bfa10033',
+      },
+      {
+        label: 'Gain total sur 20 ans',
+        value: gainTotal20ans || '-',
+        color: 'linear-gradient(90deg,#16a34a 60%,#4ade80 100%)',
+        icon: '💰',
+        valueColor: '#fff',
+        shadow: '0 2px 12px #16a34a33',
+      },
+      {
+        label: 'Prime EDF versée',
+        value: primeValueNum ? primeValueNum.toLocaleString() + ' €' : '-',
+        color: 'linear-gradient(90deg,#f59e42 60%,#fbbf24 100%)',
+        icon: '🎁',
+        valueColor: '#fff',
+        shadow: '0 2px 12px #f59e4233',
+      },
+      {
+        label: 'Puissance & Stockage',
+        value: (() => {
+          let puissance = '-';
+          let stockage = '-';
+          if (etude.kit) {
+            const kitMatch = String(etude.kit).match(/(\d+)KWh-(\d+)/);
+            if (kitMatch) {
+              puissance = kitMatch[1] + ' KWh';
+              stockage = kitMatch[2] === '1' ? '5 KWh' : kitMatch[2] === '2' ? '10 KWh' : '-';
+            }
+          }
+          return puissance + (stockage !== '-' ? ' / ' + stockage : '');
+        })(),
+        color: 'linear-gradient(90deg,#0ea5e9 60%,#38bdf8 100%)',
+        icon: '🔋',
+        valueColor: '#fff',
+        shadow: '0 2px 12px #0ea5e933',
+      },
+    ];
+  }
+
 
 // Page "Faire une proposition" pour importer et gérer des devis
 const FaireProposition = () => {
+  // --- Données visuelles pour bandeau et jauge ---
+  const getEtudeData = () => {
+    const client = clients.find((c) => c.id === selectedClient);
+    let etude = null;
+    if (
+      client?.Etude &&
+      Array.isArray(client.Etude) &&
+      client.Etude.length > 0
+    ) {
+      etude = client.Etude[0];
+    } else if (client?.etudePerso) {
+      etude = client.etudePerso;
+    } else {
+      etude = {};
+    }
+    // Extraction des valeurs
+    const puissance = etude.kit
+      ? String(etude.kit).replace(/[^0-9]/g, '') + ' kWc'
+      : '-';
+    const production = etude.prodMoyenneKwh
+      ? etude.prodMoyenneKwh + ' kWh/an'
+      : '-';
+    const autoconsommation = etude.autoconsommation
+      ? etude.autoconsommation + ' %'
+      : '-';
+    const gainPremiereAnnee = etude.gainAnnuel ? etude.gainAnnuel + ' €' : '-';
+    const anneeRentabilite = etude.anneeRentable || etude.amortissement || '-';
+    // Pour jauge
+    const consoClientNum = Number(etude.conso || etude.consoAnnuelle || 0);
+    const productionEstimeeNum = Number(etude.prodMoyenneKwh || 0);
+    // Harmonisation : conso couverte = 95% de la conso annuelle
+    const consoCouverteNum = consoClientNum
+      ? Number((consoClientNum * 0.95).toFixed(0))
+      : 0;
+    // Surplus = Production estimée - Conso couverte (arrondi 2 décimales)
+    const surplusNum =
+      productionEstimeeNum && consoCouverteNum
+        ? Number((productionEstimeeNum - consoCouverteNum).toFixed(2))
+        : 0;
+    // Revente du surplus = Surplus × 0,1767 (arrondi 2 décimales)
+    const reventeSurplus = surplusNum
+      ? Number((surplusNum * 0.1767).toFixed(2))
+      : 0;
+    // Pourcentage utilisé pour la maison = conso couverte / production estimée
+    const pourcentageUtilisation =
+      productionEstimeeNum > 0
+        ? ((consoCouverteNum / productionEstimeeNum) * 100).toFixed(1)
+        : 0;
+    // Surplus = le reste
+    const pourcentageSurplus =
+      productionEstimeeNum > 0
+        ? (
+            ((productionEstimeeNum - consoCouverteNum) / productionEstimeeNum) *
+            100
+          ).toFixed(1)
+        : 0;
+    const economieEDF = consoCouverteNum
+      ? Number((consoCouverteNum * 0.25).toFixed(2))
+      : 0;
+    return {
+      puissance,
+      production,
+      autoconsommation,
+      gainPremiereAnnee,
+      anneeRentabilite,
+      consoCouverteNum,
+      productionNum: productionEstimeeNum,
+      economieEDF,
+      surplusNum,
+      reventeSurplus,
+      pourcentageUtilisation,
+      pourcentageSurplus,
+    };
+  };
   const [devisFiles, setDevisFiles] = useState([]);
   const [selectedClient, setSelectedClient] = useState('');
   const [parsedDevis, setParsedDevis] = useState(null);
@@ -334,34 +492,21 @@ const FaireProposition = () => {
         100
       ).toFixed(1);
     }
-    // Jauge design moderne et esthétique
-    let jaugeHtml = `<div style='margin:28px 0;'>
-      <div style='font-weight:700;font-size:18px;margin-bottom:16px;color:#3730a3;'>Répartition de la production solaire :</div>
-      <div style='display:flex;align-items:center;gap:22px;margin-bottom:22px;'>
-        <span style='font-size:26px;'>🏠</span>
-        <div style='flex:1;max-width:340px;height:52px;background:linear-gradient(90deg,#e0e7ff 0%,#c7d2fe 100%);border-radius:26px;overflow:hidden;box-shadow:0 6px 24px #22c55e33;position:relative;border:2px solid #22c55e;'>
-          <div style='width:${pourcentageUtilisation}%;height:100%;background:linear-gradient(90deg,#22c55e 0%,#16a34a 60%,#a7f3d0 100%);border-radius:26px;transition:width 1.2s cubic-bezier(.4,2,.3,1);box-shadow:0 2px 12px #22c55e99;position:absolute;left:0;top:0;'></div>
-          <span style='position:absolute;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;font-size:21px;text-shadow:0 2px 8px #222;'>${pourcentageUtilisation}% utilisé pour la maison</span>
-        </div>
-        <div style='min-width:130px;text-align:left;'>
-          <span style='font-size:16px;font-weight:700;color:#2563eb;'>${consoCouverteNum} kWh utilisés</span><br/>
-          <span style='font-size:16px;font-weight:700;color:#16a34a;'>${economieEDF.replace(/<\/?b>/g, '')} économisés</span>
-        </div>
-      </div>
-      <div style='display:flex;align-items:center;gap:22px;'>
-        <span style='font-size:26px;'>💸</span>
-        <div style='flex:1;max-width:340px;height:52px;background:linear-gradient(90deg,#fef9c3 0%,#fde68a 100%);border-radius:26px;overflow:hidden;box-shadow:0 6px 24px #f9731633;position:relative;border:2px solid #f97316;'>
-          <div style='width:${pourcentageSurplus}%;height:100%;background:linear-gradient(90deg,#f97316 0%,#f59e42 60%,#fde68a 100%);border-radius:26px;transition:width 1.2s cubic-bezier(.4,2,.3,1);box-shadow:0 2px 12px #f9731699;position:absolute;left:0;top:0;'></div>
-          <span style='position:absolute;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;font-size:21px;text-shadow:0 2px 8px #222;'>${pourcentageSurplus}% en surplus revendu</span>
-        </div>
-        <div style='min-width:130px;text-align:left;'>
-          <span style='font-size:16px;font-weight:700;color:#2563eb;'>${(productionEstimeeNum - consoCouverteNum).toFixed(2)} kWh revendus</span><br/>
-          <span style='font-size:16px;font-weight:700;color:#bfa100;'>${reventeSurplus.replace(/<\/?b>/g, '')} gagnés</span>
-        </div>
-      </div>
-    </div>`;
-    // Ajout du jauge tout en haut du mail
-    mail = mail.replace(/(Monsieur et Madame [^\n]+)/, (match) => match + `\n${jaugeHtml}\n`);
+    // Génération des tags visuels pour le mail (centralisé)
+    const tags = getVisualTags(etude);
+    let tagsHtml = `<div style='display:flex;gap:16;flex-wrap:wrap;margin:24px 0 18px 0;'>` +
+      tags.map(tag => `
+        <span style='background:${tag.color};color:#fff;border-radius:16px;padding:14px 28px;font-weight:500;font-size:16px;box-shadow:0 2px 12px #0002;display:inline-flex;align-items:center;margin-right:10px;margin-bottom:8px;border:2px solid #fff2;'>
+          <span style='font-size:28px;margin-right:14px;'>${tag.icon}</span>
+          <span style='font-size:15px;opacity:0.85;'>${tag.label}</span>
+          <span style='font-size:22px;font-weight:700;margin-left:14px;color:#fff;text-shadow:0 2px 8px #0002;'>${tag.value}</span>
+        </span>
+      `).join('') + '</div>';
+    // Ajout des tags tout en haut du mail
+    mail = mail.replace(
+      /(Monsieur et Madame [^\n]+)/,
+      (match) => match + `\n${tagsHtml}\n`
+    );
     // Suppression des guillemets autour des données dynamiques dans le mail
     mail = mail.replace(/«\s*([^»]+)\s*»/g, '$1');
     setMailContent(mail);
@@ -643,33 +788,12 @@ const FaireProposition = () => {
       ).toFixed(1);
     }
     // Jauge design moderne et esthétique
-    let jaugeHtml = `<div style='margin:28px 0;'>
-      <div style='font-weight:700;font-size:18px;margin-bottom:16px;color:#3730a3;'>Répartition de la production solaire :</div>
-      <div style='display:flex;align-items:center;gap:22px;margin-bottom:22px;'>
-        <span style='font-size:26px;'>🏠</span>
-        <div style='flex:1;max-width:340px;height:52px;background:linear-gradient(90deg,#e0e7ff 0%,#c7d2fe 100%);border-radius:26px;overflow:hidden;box-shadow:0 6px 24px #22c55e33;position:relative;border:2px solid #22c55e;'>
-          <div style='width:${pourcentageUtilisation}%;height:100%;background:linear-gradient(90deg,#22c55e 0%,#16a34a 60%,#a7f3d0 100%);border-radius:26px;transition:width 1.2s cubic-bezier(.4,2,.3,1);box-shadow:0 2px 12px #22c55e99;position:absolute;left:0;top:0;'></div>
-          <span style='position:absolute;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;font-size:21px;text-shadow:0 2px 8px #222;'>${pourcentageUtilisation}% utilisé pour la maison</span>
-        </div>
-        <div style='min-width:130px;text-align:left;'>
-          <span style='font-size:16px;font-weight:700;color:#2563eb;'>${consoCouverteNum} kWh utilisés</span><br/>
-          <span style='font-size:16px;font-weight:700;color:#16a34a;'>${economieEDF.replace(/<\/?b>/g, '')} économisés</span>
-        </div>
-      </div>
-      <div style='display:flex;align-items:center;gap:22px;'>
-        <span style='font-size:26px;'>💸</span>
-        <div style='flex:1;max-width:340px;height:52px;background:linear-gradient(90deg,#fef9c3 0%,#fde68a 100%);border-radius:26px;overflow:hidden;box-shadow:0 6px 24px #f9731633;position:relative;border:2px solid #f97316;'>
-          <div style='width:${pourcentageSurplus}%;height:100%;background:linear-gradient(90deg,#f97316 0%,#f59e42 60%,#fde68a 100%);border-radius:26px;transition:width 1.2s cubic-bezier(.4,2,.3,1);box-shadow:0 2px 12px #f9731699;position:absolute;left:0;top:0;'></div>
-          <span style='position:absolute;left:0;top:0;width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-weight:900;color:#fff;font-size:21px;text-shadow:0 2px 8px #222;'>${pourcentageSurplus}% en surplus revendu</span>
-        </div>
-        <div style='min-width:130px;text-align:left;'>
-          <span style='font-size:16px;font-weight:700;color:#2563eb;'>${(productionEstimeeNum - consoCouverteNum).toFixed(2)} kWh revendus</span><br/>
-          <span style='font-size:16px;font-weight:700;color:#bfa100;'>${reventeSurplus.replace(/<\/?b>/g, '')} gagnés</span>
-        </div>
-      </div>
-    </div>`;
+    let jaugeHtml = '';
     // Ajout du jauge tout en haut du mail
-    mail = mail.replace(/(Monsieur et Madame [^\n]+)/, (match) => match + `\n${jaugeHtml}\n`);
+    mail = mail.replace(
+      /(Monsieur et Madame [^\n]+)/,
+      (match) => match + `\n${jaugeHtml}\n`
+    );
     // Suppression des guillemets autour des données dynamiques dans le mail
     mail = mail.replace(/«\s*([^»]+)\s*»/g, '$1');
     setMailContent(mail);
@@ -1075,7 +1199,13 @@ const FaireProposition = () => {
       });
       alert('Mail envoyé au client : ' + mailFields.email);
     } catch (err) {
-      alert('Erreur lors de l’envoi du mail.');
+      // Affiche un message spécifique si le mot de passe SMTP est incorrect
+      const errMsg = err?.message || String(err);
+      if (errMsg.toLowerCase().includes('auth') || errMsg.toLowerCase().includes('authentication failed') || errMsg.toLowerCase().includes('535')) {
+        alert('Mot de passe de la boîte mail incorrect ou refusé par le serveur SMTP.');
+      } else {
+        alert('Erreur lors de l’envoi du mail : ' + errMsg);
+      }
     }
   };
 
@@ -1440,6 +1570,428 @@ const FaireProposition = () => {
         >
           <h4>Mail généré :</h4>
           <div
+            style={{
+              display: 'flex',
+              gap: 16,
+              marginBottom: 18,
+              flexWrap: 'wrap',
+              alignItems: 'flex-start',
+            }}
+          >
+            {(() => {
+              const etudeData = getEtudeData();
+              const tags = [
+                {
+                  label: 'Puissance & Stockage',
+                  value: (() => {
+                    const client = clients.find((c) => c.id === selectedClient);
+                    let etude = null;
+                    if (
+                      client?.Etude &&
+                      Array.isArray(client.Etude) &&
+                      client.Etude.length > 0
+                    ) {
+                      etude = client.Etude[0];
+                    } else if (client?.etudePerso) {
+                      etude = client.etudePerso;
+                    } else {
+                      etude = {};
+                    }
+                    // Extraction puissance et stockage
+                    let puissance = '-';
+                    let stockage = '-';
+                    if (etude.kit) {
+                      const kitMatch = String(etude.kit).match(
+                        /(\d+)KWh-(\d+)/
+                      );
+                      if (kitMatch) {
+                        puissance = kitMatch[1] + ' KWh';
+                        stockage =
+                          kitMatch[2] === '1'
+                            ? '5 KWh'
+                            : kitMatch[2] === '2'
+                            ? '10 KWh'
+                            : '-';
+                      }
+                    }
+                    return (
+                      puissance + (stockage !== '-' ? ' / ' + stockage : '')
+                    );
+                  })(),
+                  color: 'linear-gradient(90deg,#0ea5e9 60%,#38bdf8 100%)',
+                  icon: '🔋',
+                  valueColor: '#fff',
+                  shadow: '0 2px 12px #0ea5e933',
+                },
+                {
+                  label: 'Prime EDF versée',
+                  value: (() => {
+                    const client = clients.find((c) => c.id === selectedClient);
+                    let etude = null;
+                    if (
+                      client?.Etude &&
+                      Array.isArray(client.Etude) &&
+                      client.Etude.length > 0
+                    ) {
+                      etude = client.Etude[0];
+                    } else if (client?.etudePerso) {
+                      etude = client.etudePerso;
+                    } else {
+                      etude = {};
+                    }
+                    const primeValue = Number(
+                      etude.primeEDF || etude.prime || 0
+                    );
+                    return primeValue
+                      ? primeValue.toLocaleString() + ' €'
+                      : '-';
+                  })(),
+                  color: 'linear-gradient(90deg,#FFB5DA 60%,#FF7ED4 100%)',
+                  icon: '🎁',
+                  valueColor: '#fff',
+                  shadow: '0 2px 12px #f59e4233',
+                },
+                {
+                  label: 'Production annuelle',
+                  value: etudeData.production,
+                  color: 'linear-gradient(90deg,#FFB5DA 60%,#FF7ED4 100%)',
+                  icon: '⚡',
+                  valueColor: '#fff',
+                  shadow: '0 2px 12px #FFB5DA33',
+                },
+                {
+                  label: 'Rentable en ',
+                  value: etudeData.anneeRentabilite,
+                  color: 'linear-gradient(90deg,#FFB5DA 60%,#FF7ED4 100%)',
+                  icon: '⏳',
+                  valueColor: '#fff',
+                  shadow: '0 2px 12px #FFB5DA33',
+                },
+                {
+                  label: 'Economie et Gain total sur 20 ans',
+                  value: (() => {
+                    // Try to get total gain from rentability table if available
+                    const client = clients.find((c) => c.id === selectedClient);
+                    let etude = null;
+                    if (
+                      client?.Etude &&
+                      Array.isArray(client.Etude) &&
+                      client.Etude.length > 0
+                    ) {
+                      etude = client.Etude[0];
+                    } else if (client?.etudePerso) {
+                      etude = client.etudePerso;
+                    } else {
+                      etude = {};
+                    }
+                    let totalGain = '-';
+                    Object.entries(etude).forEach(([key, value]) => {
+                      if (
+                        Array.isArray(value) &&
+                        value.length > 0 &&
+                        typeof value[0] === 'object' &&
+                        value[0] !== null &&
+                        ('annee' in value[0] ||
+                          'coutEdf' in value[0] ||
+                          'mensualiteEdf' in value[0])
+                      ) {
+                        const totalDiff = value.reduce(
+                          (sum, row) => sum + (Number(row.diff) || 0),
+                          0
+                        );
+                        const totalRevente = value.reduce(
+                          (sum, row) => sum + (Number(row.reventeEstimee) || 0),
+                          0
+                        );
+                        totalGain =
+                          (totalDiff + totalRevente).toLocaleString() + ' €';
+                      }
+                    });
+                    return totalGain;
+                  })(),
+                  color: 'linear-gradient(90deg,#16a34a 60%,#4ade80 100%)',
+                  icon: '💰',
+                  valueColor: '#fff',
+                  shadow: '0 2px 12px #16a34a33',
+                },
+              ];
+              // Jauges graphiques
+              const jauges = [
+                {
+                  icon: '🏠',
+                  percent: (() => {
+                    // Synchronisation : calcul identique au mail
+                    const client = clients.find((c) => c.id === selectedClient);
+                    let etude = null;
+                    if (
+                      client?.Etude &&
+                      Array.isArray(client.Etude) &&
+                      client.Etude.length > 0
+                    ) {
+                      etude = client.Etude[0];
+                    } else if (client?.etudePerso) {
+                      etude = client.etudePerso;
+                    } else {
+                      etude = {};
+                    }
+                    const productionEstimeeNum = Number(
+                      etude.prodMoyenneKwh || 0
+                    );
+                    const consoAnnuelleNum = Number(
+                      etude.conso || etude.consoAnnuelle || 0
+                    );
+                    const consoCouverteNum = consoAnnuelleNum
+                      ? Number((consoAnnuelleNum * 0.95).toFixed(0))
+                      : 0;
+                    return productionEstimeeNum > 0
+                      ? (
+                          (consoCouverteNum / productionEstimeeNum) *
+                          100
+                        ).toFixed(1)
+                      : '0.0';
+                  })(),
+                  label: 'utilisé pour la maison',
+                  kwh: (() => {
+                    // Synchronisation : conso couverte identique au mail
+                    const client = clients.find((c) => c.id === selectedClient);
+                    let etude = null;
+                    if (
+                      client?.Etude &&
+                      Array.isArray(client.Etude) &&
+                      client.Etude.length > 0
+                    ) {
+                      etude = client.Etude[0];
+                    } else if (client?.etudePerso) {
+                      etude = client.etudePerso;
+                    } else {
+                      etude = {};
+                    }
+                    const consoAnnuelleNum = Number(
+                      etude.conso || etude.consoAnnuelle || 0
+                    );
+                    return consoAnnuelleNum
+                      ? Number((consoAnnuelleNum * 0.95).toFixed(0))
+                      : 0;
+                  })(),
+                  euros: (() => {
+                    // Synchronisation : économie EDF identique au mail
+                    const client = clients.find((c) => c.id === selectedClient);
+                    let etude = null;
+                    if (
+                      client?.Etude &&
+                      Array.isArray(client.Etude) &&
+                      client.Etude.length > 0
+                    ) {
+                      etude = client.Etude[0];
+                    } else if (client?.etudePerso) {
+                      etude = client.etudePerso;
+                    } else {
+                      etude = {};
+                    }
+                    const consoAnnuelleNum = Number(
+                      etude.conso || etude.consoAnnuelle || 0
+                    );
+                    const consoCouverteNum = consoAnnuelleNum
+                      ? Number((consoAnnuelleNum * 0.95).toFixed(0))
+                      : 0;
+                    return consoCouverteNum
+                      ? `${(consoCouverteNum * 0.25).toFixed(2)} €`
+                      : '0.00 €';
+                  })(),
+                  color: 'linear-gradient(90deg,#4ade80 60%,#60a5fa 100%)',
+                  textColor: '#fff',
+                  valueColor: '#16a34a',
+                },
+                {
+                  icon: '💸',
+                  percent: (() => {
+                    // Synchronisation : calcul identique au mail
+                    const client = clients.find((c) => c.id === selectedClient);
+                    let etude = null;
+                    if (
+                      client?.Etude &&
+                      Array.isArray(client.Etude) &&
+                      client.Etude.length > 0
+                    ) {
+                      etude = client.Etude[0];
+                    } else if (client?.etudePerso) {
+                      etude = client.etudePerso;
+                    } else {
+                      etude = {};
+                    }
+                    const productionEstimeeNum = Number(
+                      etude.prodMoyenneKwh || 0
+                    );
+                    const consoAnnuelleNum = Number(
+                      etude.conso || etude.consoAnnuelle || 0
+                    );
+                    const consoCouverteNum = consoAnnuelleNum
+                      ? Number((consoAnnuelleNum * 0.95).toFixed(0))
+                      : 0;
+                    return productionEstimeeNum > 0
+                      ? (
+                          ((productionEstimeeNum - consoCouverteNum) /
+                            productionEstimeeNum) *
+                          100
+                        ).toFixed(1)
+                      : '0.0';
+                  })(),
+                  label: 'en surplus revendu',
+                  kwh: (() => {
+                    // Synchronisation : surplus identique au mail
+                    const client = clients.find((c) => c.id === selectedClient);
+                    let etude = null;
+                    if (
+                      client?.Etude &&
+                      Array.isArray(client.Etude) &&
+                      client.Etude.length > 0
+                    ) {
+                      etude = client.Etude[0];
+                    } else if (client?.etudePerso) {
+                      etude = client.etudePerso;
+                    } else {
+                      etude = {};
+                    }
+                    const productionEstimeeNum = Number(
+                      etude.prodMoyenneKwh || 0
+                    );
+                    const consoAnnuelleNum = Number(
+                      etude.conso || etude.consoAnnuelle || 0
+                    );
+                    const consoCouverteNum = consoAnnuelleNum
+                      ? Number((consoAnnuelleNum * 0.95).toFixed(0))
+                      : 0;
+                    return productionEstimeeNum && consoCouverteNum
+                      ? (productionEstimeeNum - consoCouverteNum).toFixed(2)
+                      : '0.00';
+                  })(),
+                  euros: (() => {
+                    // Synchronisation : revente identique au mail
+                    const client = clients.find((c) => c.id === selectedClient);
+                    let etude = null;
+                    if (
+                      client?.Etude &&
+                      Array.isArray(client.Etude) &&
+                      client.Etude.length > 0
+                    ) {
+                      etude = client.Etude[0];
+                    } else if (client?.etudePerso) {
+                      etude = client.etudePerso;
+                    } else {
+                      etude = {};
+                    }
+                    const productionEstimeeNum = Number(
+                      etude.prodMoyenneKwh || 0
+                    );
+                    const consoAnnuelleNum = Number(
+                      etude.conso || etude.consoAnnuelle || 0
+                    );
+                    const consoCouverteNum = consoAnnuelleNum
+                      ? Number((consoAnnuelleNum * 0.95).toFixed(0))
+                      : 0;
+                    const surplusNum =
+                      productionEstimeeNum && consoCouverteNum
+                        ? productionEstimeeNum - consoCouverteNum
+                        : 0;
+                    return surplusNum
+                      ? `${(surplusNum * 0.1767).toFixed(2)} €`
+                      : '0.00 €';
+                  })(),
+                  color: 'linear-gradient(90deg,#fbbf24 60%,#f87171 100%)',
+                  textColor: '#fff',
+                  valueColor: '#bfa100',
+                },
+              ];
+              return [
+                ...tags.map((tag, idx) => (
+                  <span
+                    key={idx}
+                    style={{
+                      background: tag.color,
+                      color: '#fff',
+                      borderRadius: 16,
+                      padding: '14px 28px',
+                      fontWeight: 500,
+                      fontSize: 16,
+                      boxShadow: tag.shadow,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      marginRight: 10,
+                      marginBottom: 8,
+                      border: '2px solid #fff2',
+                      transition: 'transform 0.2s',
+                    }}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.transform = 'scale(1.04)')
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.transform = 'scale(1)')
+                    }
+                  >
+                    <span style={{ fontSize: 28, marginRight: 14 }}>
+                      {tag.icon}
+                    </span>
+                    <span style={{ fontSize: 15, opacity: 0.85 }}>
+                      {tag.label}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 22,
+                        fontWeight: 700,
+                        marginLeft: 14,
+                        color: tag.valueColor,
+                        textShadow: '0 2px 8px #0002',
+                      }}
+                    >
+                      {tag.value}
+                    </span>
+                  </span>
+                )),
+                ...jauges.map((jauge, idx) => (
+                  <div
+                    key={'jauge-' + idx}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      background: jauge.color,
+                      borderRadius: 24,
+                      padding: '8px 24px',
+                      fontWeight: 700,
+                      fontSize: 20,
+                      color: jauge.textColor,
+                      boxShadow: '0 2px 8px #0002',
+                      marginRight: 8,
+                      minWidth: 260,
+                      marginTop: 2,
+                    }}
+                  >
+                    <span style={{ fontSize: 26, marginRight: 10 }}>
+                      {jauge.icon}
+                    </span>
+                    <span style={{ marginRight: 10 }}>
+                      {Number(jauge.percent).toFixed(1)}% {jauge.label}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 15,
+                        fontWeight: 400,
+                        marginLeft: 16,
+                        color: '#e0e7ff',
+                        textAlign: 'right',
+                      }}
+                    >
+                      {jauge.kwh} kWh
+                      <br />
+                      <span style={{ color: '#fff', fontWeight: 600 }}>
+                        {jauge.euros} {idx === 0 ? '€ économisés' : '€ gagnés'}
+                      </span>
+                    </span>
+                  </div>
+                )),
+              ];
+            })()}
+          </div>
+          <div
             dangerouslySetInnerHTML={{
               __html: mailContent.replace(/\n/g, '<br />'),
             }}
@@ -1478,11 +2030,396 @@ const FaireProposition = () => {
             }}
           >
             <h4 style={{ color: '#2563eb' }}>Mail récapitulatif</h4>
-            <div
-              dangerouslySetInnerHTML={{
-                __html: mailContent.replace(/\n/g, '<br />'),
-              }}
-            />
+            {/* Aperçu complet : injecte le HTML du mail généré, puis ajoute le tableau de rentabilité et le devis si demandé */}
+            {/* Bloc d'étiquettes/tags et jauges identique au mail généré */}
+            {(() => {
+              const etudeData = getEtudeData();
+              const tags = [
+                // ...copie du code de génération des tags du mail généré...
+                {
+                  label: 'Puissance & Stockage',
+                  value: (() => {
+                    const client = clients.find((c) => c.id === selectedClient);
+                    let etude = null;
+                    if (
+                      client?.Etude &&
+                      Array.isArray(client.Etude) &&
+                      client.Etude.length > 0
+                    ) {
+                      etude = client.Etude[0];
+                    } else if (client?.etudePerso) {
+                      etude = client.etudePerso;
+                    } else {
+                      etude = {};
+                    }
+                    // Extraction puissance et stockage
+                    let puissance = '-';
+                    let stockage = '-';
+                    if (etude.kit) {
+                      const kitMatch = String(etude.kit).match(
+                        /(\d+)KWh-(\d+)/
+                      );
+                      if (kitMatch) {
+                        puissance = kitMatch[1] + ' KWh';
+                        stockage =
+                          kitMatch[2] === '1'
+                            ? '5 KWh'
+                            : kitMatch[2] === '2'
+                            ? '10 KWh'
+                            : '-';
+                      }
+                    }
+                    return (
+                      puissance + (stockage !== '-' ? ' / ' + stockage : '')
+                    );
+                  })(),
+                  color: 'linear-gradient(90deg,#0ea5e9 60%,#38bdf8 100%)',
+                  icon: '🔋',
+                  valueColor: '#fff',
+                  shadow: '0 2px 12px #0ea5e933',
+                },
+                {
+                  label: 'Prime EDF versée',
+                  value: (() => {
+                    const client = clients.find((c) => c.id === selectedClient);
+                    let etude = null;
+                    if (
+                      client?.Etude &&
+                      Array.isArray(client.Etude) &&
+                      client.Etude.length > 0
+                    ) {
+                      etude = client.Etude[0];
+                    } else if (client?.etudePerso) {
+                      etude = client.etudePerso;
+                    } else {
+                      etude = {};
+                    }
+                    const primeValue = Number(
+                      etude.primeEDF || etude.prime || 0
+                    );
+                    return primeValue
+                      ? primeValue.toLocaleString() + ' €'
+                      : '-';
+                  })(),
+                  color: 'linear-gradient(90deg,#FFB5DA 60%,#FF7ED4 100%)',
+                  icon: '🎁',
+                  valueColor: '#fff',
+                  shadow: '0 2px 12px #f59e4233',
+                },
+                {
+                  label: 'Production annuelle',
+                  value: etudeData.production,
+                  color: 'linear-gradient(90deg,#FFB5DA 60%,#FF7ED4 100%)',
+                  icon: '⚡',
+                  valueColor: '#fff',
+                  shadow: '0 2px 12px #FFB5DA33',
+                },
+                {
+                  label: 'Rentable en ',
+                  value: etudeData.anneeRentabilite,
+                  color: 'linear-gradient(90deg,#FFB5DA 60%,#FF7ED4 100%)',
+                  icon: '⏳',
+                  valueColor: '#fff',
+                  shadow: '0 2px 12px #FFB5DA33',
+                },
+                {
+                  label: 'Economie et Gain total sur 20 ans',
+                  value: (() => {
+                    // Try to get total gain from rentability table if available
+                    const client = clients.find((c) => c.id === selectedClient);
+                    let etude = null;
+                    if (
+                      client?.Etude &&
+                      Array.isArray(client.Etude) &&
+                      client.Etude.length > 0
+                    ) {
+                      etude = client.Etude[0];
+                    } else if (client?.etudePerso) {
+                      etude = client.etudePerso;
+                    } else {
+                      etude = {};
+                    }
+                    let totalGain = '-';
+                    Object.entries(etude).forEach(([key, value]) => {
+                      if (
+                        Array.isArray(value) &&
+                        value.length > 0 &&
+                        typeof value[0] === 'object' &&
+                        value[0] !== null &&
+                        ('annee' in value[0] ||
+                          'coutEdf' in value[0] ||
+                          'mensualiteEdf' in value[0])
+                      ) {
+                        const totalDiff = value.reduce(
+                          (sum, row) => sum + (Number(row.diff) || 0),
+                          0
+                        );
+                        const totalRevente = value.reduce(
+                          (sum, row) => sum + (Number(row.reventeEstimee) || 0),
+                          0
+                        );
+                        totalGain =
+                          (totalDiff + totalRevente).toLocaleString() + ' €';
+                      }
+                    });
+                    return totalGain;
+                  })(),
+                  color: 'linear-gradient(90deg,#16a34a 60%,#4ade80 100%)',
+                  icon: '💰',
+                  valueColor: '#fff',
+                  shadow: '0 2px 12px #16a34a33',
+                },
+              ];
+              // Jauges graphiques
+              const jauges = [
+                {
+                  icon: '🏠',
+                  percent: (() => {
+                    // Synchronisation : calcul identique au mail
+                    const client = clients.find((c) => c.id === selectedClient);
+                    let etude = null;
+                    if (
+                      client?.Etude &&
+                      Array.isArray(client.Etude) &&
+                      client.Etude.length > 0
+                    ) {
+                      etude = client.Etude[0];
+                    } else if (client?.etudePerso) {
+                      etude = client.etudePerso;
+                    } else {
+                      etude = {};
+                    }
+                    const productionEstimeeNum = Number(
+                      etude.prodMoyenneKwh || 0
+                    );
+                    const consoAnnuelleNum = Number(
+                      etude.conso || etude.consoAnnuelle || 0
+                    );
+                    const consoCouverteNum = consoAnnuelleNum
+                      ? Number((consoAnnuelleNum * 0.95).toFixed(0))
+                      : 0;
+                    return productionEstimeeNum > 0
+                      ? (
+                          (consoCouverteNum / productionEstimeeNum) *
+                          100
+                        ).toFixed(1)
+                      : '0.0';
+                  })(),
+                  label: 'utilisé pour la maison',
+                  kwh: (() => {
+                    // Synchronisation : conso couverte identique au mail
+                    const client = clients.find((c) => c.id === selectedClient);
+                    let etude = null;
+                    if (
+                      client?.Etude &&
+                      Array.isArray(client.Etude) &&
+                      client.Etude.length > 0
+                    ) {
+                      etude = client.Etude[0];
+                    } else if (client?.etudePerso) {
+                      etude = client.etudePerso;
+                    } else {
+                      etude = {};
+                    }
+                    const consoAnnuelleNum = Number(
+                      etude.conso || etude.consoAnnuelle || 0
+                    );
+                    return consoAnnuelleNum
+                      ? (consoAnnuelleNum * 0.95).toFixed(0)
+                      : '0';
+                  })(),
+                  euros: (() => {
+                    // Synchronisation : économies identiques au mail
+                    const client = clients.find((c) => c.id === selectedClient);
+                    let etude = null;
+                    if (
+                      client?.Etude &&
+                      Array.isArray(client.Etude) &&
+                      client.Etude.length > 0
+                    ) {
+                      etude = client.Etude[0];
+                    } else if (client?.etudePerso) {
+                      etude = client.etudePerso;
+                    } else {
+                      etude = {};
+                    }
+                    const consoAnnuelleNum = Number(
+                      etude.conso || etude.consoAnnuelle || 0
+                    );
+                    const economieEDF = consoAnnuelleNum
+                      ? (consoAnnuelleNum * 0.95 * 0.25).toFixed(2)
+                      : '0.00';
+                    return economieEDF + ' € économisés';
+                  })(),
+                  color: 'linear-gradient(90deg,#4ade80 60%,#38bdf8 100%)',
+                  textColor: '#fff',
+                  valueColor: '#16a34a',
+                },
+                {
+                  icon: '💸',
+                  percent: (() => {
+                    // Synchronisation : calcul identique au mail
+                    const client = clients.find((c) => c.id === selectedClient);
+                    let etude = null;
+                    if (
+                      client?.Etude &&
+                      Array.isArray(client.Etude) &&
+                      client.Etude.length > 0
+                    ) {
+                      etude = client.Etude[0];
+                    } else if (client?.etudePerso) {
+                      etude = client.etudePerso;
+                    } else {
+                      etude = {};
+                    }
+                    const productionEstimeeNum = Number(
+                      etude.prodMoyenneKwh || 0
+                    );
+                    const consoAnnuelleNum = Number(
+                      etude.conso || etude.consoAnnuelle || 0
+                    );
+                    const consoCouverteNum = consoAnnuelleNum
+                      ? Number((consoAnnuelleNum * 0.95).toFixed(0))
+                      : 0;
+                    return productionEstimeeNum > 0
+                      ? (
+                          ((productionEstimeeNum - consoCouverteNum) /
+                            productionEstimeeNum) *
+                          100
+                        ).toFixed(1)
+                      : '0.0';
+                  })(),
+                  label: 'en surplus revendu',
+                  kwh: (() => {
+                    // Synchronisation : surplus identique au mail
+                    const client = clients.find((c) => c.id === selectedClient);
+                    let etude = null;
+                    if (
+                      client?.Etude &&
+                      Array.isArray(client.Etude) &&
+                      client.Etude.length > 0
+                    ) {
+                      etude = client.Etude[0];
+                    } else if (client?.etudePerso) {
+                      etude = client.etudePerso;
+                    } else {
+                      etude = {};
+                    }
+                    const productionEstimeeNum = Number(
+                      etude.prodMoyenneKwh || 0
+                    );
+                    const consoAnnuelleNum = Number(
+                      etude.conso || etude.consoAnnuelle || 0
+                    );
+                    const consoCouverteNum = consoAnnuelleNum
+                      ? Number((consoAnnuelleNum * 0.95).toFixed(0))
+                      : 0;
+                    return productionEstimeeNum && consoCouverteNum
+                      ? (productionEstimeeNum - consoCouverteNum).toFixed(2)
+                      : '0.00';
+                  })(),
+                  euros: (() => {
+                    // Synchronisation : revente identique au mail
+                    const client = clients.find((c) => c.id === selectedClient);
+                    let etude = null;
+                    if (
+                      client?.Etude &&
+                      Array.isArray(client.Etude) &&
+                      client.Etude.length > 0
+                    ) {
+                      etude = client.Etude[0];
+                    } else if (client?.etudePerso) {
+                      etude = client.etudePerso;
+                    } else {
+                      etude = {};
+                    }
+                    const productionEstimeeNum = Number(
+                      etude.prodMoyenneKwh || 0
+                    );
+                    const consoAnnuelleNum = Number(
+                      etude.conso || etude.consoAnnuelle || 0
+                    );
+                    const consoCouverteNum = consoAnnuelleNum
+                      ? Number((consoAnnuelleNum * 0.95).toFixed(0))
+                      : 0;
+                    const surplusNum =
+                      productionEstimeeNum && consoCouverteNum
+                        ? productionEstimeeNum - consoCouverteNum
+                        : 0;
+                    return surplusNum
+                      ? `${(surplusNum * 0.1767).toFixed(2)} €`
+                      : '0.00 €';
+                  })(),
+                  color: 'linear-gradient(90deg,#fbbf24 60%,#f87171 100%)',
+                  textColor: '#fff',
+                  valueColor: '#bfa100',
+                },
+              ];
+              return [
+                ...tags.map((tag, idx) => (
+                  <span
+                    key={idx}
+                    style={{
+                      background: tag.color,
+                      color: '#fff',
+                      borderRadius: 16,
+                      padding: '14px 28px',
+                      fontWeight: 500,
+                      fontSize: 16,
+                      boxShadow: tag.shadow,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      marginRight: 10,
+                      marginBottom: 8,
+                      border: '2px solid #fff2',
+                      transition: 'transform 0.2s',
+                    }}
+                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
+                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                  >
+                    <span style={{ fontSize: 28, marginRight: 14 }}>{tag.icon}</span>
+                    <span style={{ fontSize: 15, opacity: 0.85 }}>{tag.label}</span>
+                    <span style={{
+                      fontSize: 22,
+                      fontWeight: 700,
+                      marginLeft: 14,
+                      color: tag.valueColor,
+                      textShadow: '0 2px 8px #0002',
+                    }}>{tag.value}</span>
+                  </span>
+                )),
+                ...jauges.map((jauge, idx) => (
+                  <div
+                    key={'jauge-' + idx}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      background: jauge.color,
+                      borderRadius: 24,
+                      padding: '8px 24px',
+                      fontWeight: 700,
+                      fontSize: 20,
+                      color: jauge.textColor,
+                      boxShadow: '0 2px 8px #0002',
+                      marginRight: 8,
+                      minWidth: 260,
+                      marginTop: 2,
+                    }}
+                  >
+                    <span style={{ fontSize: 26, marginRight: 10 }}>{jauge.icon}</span>
+                    <span style={{ marginRight: 10 }}>{Number(jauge.percent).toFixed(1)}% {jauge.label}</span>
+                    <span style={{
+                      fontSize: 15,
+                      fontWeight: 400,
+                      marginLeft: 16,
+                      color: '#e0e7ff',
+                      textAlign: 'right',
+                    }}>{jauge.kwh} kWh<br /><span style={{ color: '#fff', fontWeight: 600 }}>{jauge.euros} {idx === 0 ? '€ économisés' : '€ gagnés'}</span></span>
+                  </div>
+                )),
+              ];
+            })()}
+            <div dangerouslySetInnerHTML={{ __html: mailContent.replace(/\n/g, '<br />') }} />
             {includeTableInMail &&
               selectedClient &&
               (() => {
