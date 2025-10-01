@@ -1,3 +1,166 @@
+// Fonction utilitaire pour générer le HTML des tags/jauges (pour mail et aperçu)
+function getTagsJaugesHtml(etude, etudeData) {
+  // Tags
+  const tags = [
+    {
+      label: 'Puissance & Stockage',
+      value: (() => {
+        let puissance = '-';
+        let stockage = '-';
+        if (etude.kit) {
+          const kitMatch = String(etude.kit).match(/(\d+)KWh-(\d+)/);
+          if (kitMatch) {
+            puissance = kitMatch[1] + ' KWh';
+            stockage =
+              kitMatch[2] === '1'
+                ? '5 KWh'
+                : kitMatch[2] === '2'
+                ? '10 KWh'
+                : '-';
+          }
+        }
+        return puissance + (stockage !== '-' ? ' / ' + stockage : '');
+      })(),
+      color: 'linear-gradient(90deg,#0ea5e9 60%,#38bdf8 100%)',
+      icon: '🔋',
+      valueColor: '#fff',
+      shadow: '0 2px 12px #0ea5e933',
+    },
+    {
+      label: 'Prime EDF versée',
+      value: (() => {
+        const primeValue = Number(etude.primeEDF || etude.prime || 0);
+        return primeValue ? primeValue.toLocaleString() + ' €' : '-';
+      })(),
+      color: 'linear-gradient(90deg,#FFB5DA 60%,#FF7ED4 100%)',
+      icon: '🎁',
+      valueColor: '#fff',
+      shadow: '0 2px 12px #f59e4233',
+    },
+    {
+      label: 'Production annuelle',
+      value: etudeData.production,
+      color: 'linear-gradient(90deg,#FFB5DA 60%,#FF7ED4 100%)',
+      icon: '⚡',
+      valueColor: '#fff',
+      shadow: '0 2px 12px #FFB5DA33',
+    },
+    {
+      label: 'Rentable en ',
+      value: etudeData.anneeRentabilite,
+      color: 'linear-gradient(90deg,#FFB5DA 60%,#FF7ED4 100%)',
+      icon: '⏳',
+      valueColor: '#fff',
+      shadow: '0 2px 12px #FFB5DA33',
+    },
+    {
+      label: 'Economie et Gain total sur 20 ans',
+      value: (() => {
+        let totalGain = '-';
+        Object.entries(etude).forEach(([key, value]) => {
+          if (
+            Array.isArray(value) &&
+            value.length > 0 &&
+            typeof value[0] === 'object' &&
+            value[0] !== null &&
+            ('annee' in value[0] ||
+              'coutEdf' in value[0] ||
+              'mensualiteEdf' in value[0])
+          ) {
+            const totalDiff = value.reduce(
+              (sum, row) => sum + (Number(row.diff) || 0),
+              0
+            );
+            const totalRevente = value.reduce(
+              (sum, row) => sum + (Number(row.reventeEstimee) || 0),
+              0
+            );
+            totalGain = (totalDiff + totalRevente).toLocaleString() + ' €';
+          }
+        });
+        return totalGain;
+      })(),
+      color: 'linear-gradient(90deg,#16a34a 60%,#4ade80 100%)',
+      icon: '💰',
+      valueColor: '#fff',
+      shadow: '0 2px 12px #16a34a33',
+    },
+  ];
+  // Jauges
+  const productionEstimeeNum = Number(etude.prodMoyenneKwh || 0);
+  const consoAnnuelleNum = Number(etude.conso || etude.consoAnnuelle || 0);
+  const consoCouverteNum = consoAnnuelleNum
+    ? Number((consoAnnuelleNum * 0.95).toFixed(0))
+    : 0;
+  const jauges = [
+    {
+      icon: '🏠',
+      percent:
+        productionEstimeeNum > 0
+          ? ((consoCouverteNum / productionEstimeeNum) * 100).toFixed(1)
+          : '0.0',
+      label: 'utilisé pour la maison',
+      kwh: consoCouverteNum,
+      euros: consoCouverteNum
+        ? `${(consoCouverteNum * 0.25).toFixed(2)} €`
+        : '0.00 €',
+      color: 'linear-gradient(90deg,#4ade80 60%,#60a5fa 100%)',
+      textColor: '#fff',
+      valueColor: '#16a34a',
+    },
+    {
+      icon: '💸',
+      percent:
+        productionEstimeeNum > 0
+          ? (
+              ((productionEstimeeNum - consoCouverteNum) /
+                productionEstimeeNum) *
+              100
+            ).toFixed(1)
+          : '0.0',
+      label: 'en surplus revendu',
+      kwh:
+        productionEstimeeNum && consoCouverteNum
+          ? (productionEstimeeNum - consoCouverteNum).toFixed(2)
+          : '0.00',
+      euros: (() => {
+        const surplusNum =
+          productionEstimeeNum && consoCouverteNum
+            ? productionEstimeeNum - consoCouverteNum
+            : 0;
+        return surplusNum ? `${(surplusNum * 0.1767).toFixed(2)} €` : '0.00 €';
+      })(),
+      color: 'linear-gradient(90deg,#fbbf24 60%,#f87171 100%)',
+      textColor: '#fff',
+      valueColor: '#bfa100',
+    },
+  ];
+  // Génération du HTML inline pour tags et jauges
+  let html =
+    '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:18px;align-items:flex-start">';
+  tags.forEach((tag) => {
+    html += `<span style="background:${tag.color};color:#fff;border-radius:16px;padding:14px 28px;font-weight:500;font-size:16px;box-shadow:${tag.shadow};display:inline-flex;align-items:center;margin-right:10px;margin-bottom:8px;border:2px solid #fff2;">`;
+    html += `<span style="font-size:28px;margin-right:14px;">${tag.icon}</span>`;
+    html += `<span style="font-size:15px;opacity:0.85;">${tag.label}</span>`;
+    html += `<span style="font-size:22px;font-weight:700;margin-left:14px;color:${tag.valueColor};text-shadow:0 2px 8px #0002;">${tag.value}</span>`;
+    html += `</span>`;
+  });
+  jauges.forEach((jauge, idx) => {
+    html += `<div style="display:flex;align-items:center;background:${jauge.color};border-radius:24px;padding:8px 24px;font-weight:700;font-size:20px;color:${jauge.textColor};box-shadow:0 2px 8px #0002;margin-right:8px;min-width:260px;margin-top:2px;">`;
+    html += `<span style="font-size:26px;margin-right:10px;">${jauge.icon}</span>`;
+    html += `<span style="margin-right:10px;">${Number(jauge.percent).toFixed(
+      1
+    )}% ${jauge.label}</span>`;
+    html += `<span style="font-size:15px;font-weight:400;margin-left:16px;color:#e0e7ff;text-align:right;">${
+      jauge.kwh
+    } kWh<br /><span style="color:#fff;font-weight:600;">${jauge.euros} ${
+      idx === 0 ? '€ économisés' : '€ gagnés'
+    }</span></span>`;
+    html += `</div>`;
+  });
+  html += '</div>';
+  return html;
+}
 import React, { useState, useEffect, useCallback } from 'react';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, getDocs, collection, addDoc } from 'firebase/firestore';
@@ -5,88 +168,100 @@ import { getApp } from 'firebase/app';
 import * as XLSX from 'xlsx';
 
 // Fonction utilitaire pour générer les tags visuels (données + design)
-  function getVisualTags(etude) {
-    // Calculs pour tags
-    const primeValueNum = Number(etude.primeEDF || etude.prime || 0);
-    let anneeRentable = null;
-    let gainTotal20ans = null;
-    Object.entries(etude).forEach(([key, value]) => {
-      if (
-        Array.isArray(value) &&
-        value.length > 0 &&
-        typeof value[0] === 'object' &&
-        value[0] !== null &&
-        ('annee' in value[0] || 'coutEdf' in value[0] || 'mensualiteEdf' in value[0])
-      ) {
-        let cumul = 0;
-        for (let i = 0; i < value.length; i++) {
-          const diff = Number(value[i].diff) || 0;
-          const revente = Number(value[i].reventeEstimee) || 0;
-          const total = diff + revente;
-          if (total < 0) cumul++;
-          else break;
-        }
-        anneeRentable = cumul + 1;
-        const totalDiff = value.reduce((sum, row) => sum + (Number(row.diff) || 0), 0);
-        const totalRevente = value.reduce((sum, row) => sum + (Number(row.reventeEstimee) || 0), 0);
-        gainTotal20ans = (totalDiff + totalRevente).toLocaleString() + ' €';
+function getVisualTags(etude) {
+  // Calculs pour tags
+  const primeValueNum = Number(etude.primeEDF || etude.prime || 0);
+  let anneeRentable = null;
+  let gainTotal20ans = null;
+  Object.entries(etude).forEach(([key, value]) => {
+    if (
+      Array.isArray(value) &&
+      value.length > 0 &&
+      typeof value[0] === 'object' &&
+      value[0] !== null &&
+      ('annee' in value[0] ||
+        'coutEdf' in value[0] ||
+        'mensualiteEdf' in value[0])
+    ) {
+      let cumul = 0;
+      for (let i = 0; i < value.length; i++) {
+        const diff = Number(value[i].diff) || 0;
+        const revente = Number(value[i].reventeEstimee) || 0;
+        const total = diff + revente;
+        if (total < 0) cumul++;
+        else break;
       }
-    });
-    return [
-      {
-        label: 'Production annuelle',
-        value: etude.prodMoyenneKwh ? etude.prodMoyenneKwh + ' kWh/an' : '-',
-        color: 'linear-gradient(90deg,#2563eb 60%,#60a5fa 100%)',
-        icon: '⚡',
-        valueColor: '#fff',
-        shadow: '0 2px 12px #2563eb33',
-      },
-      {
-        label: 'Année de rentabilité',
-        value: anneeRentable || etude.amortissement || '-',
-        color: 'linear-gradient(90deg,#bfa100 60%,#fbbf24 100%)',
-        icon: '⏳',
-        valueColor: '#fff',
-        shadow: '0 2px 12px #bfa10033',
-      },
-      {
-        label: 'Gain total sur 20 ans',
-        value: gainTotal20ans || '-',
-        color: 'linear-gradient(90deg,#16a34a 60%,#4ade80 100%)',
-        icon: '💰',
-        valueColor: '#fff',
-        shadow: '0 2px 12px #16a34a33',
-      },
-      {
-        label: 'Prime EDF versée',
-        value: primeValueNum ? primeValueNum.toLocaleString() + ' €' : '-',
-        color: 'linear-gradient(90deg,#f59e42 60%,#fbbf24 100%)',
-        icon: '🎁',
-        valueColor: '#fff',
-        shadow: '0 2px 12px #f59e4233',
-      },
-      {
-        label: 'Puissance & Stockage',
-        value: (() => {
-          let puissance = '-';
-          let stockage = '-';
-          if (etude.kit) {
-            const kitMatch = String(etude.kit).match(/(\d+)KWh-(\d+)/);
-            if (kitMatch) {
-              puissance = kitMatch[1] + ' KWh';
-              stockage = kitMatch[2] === '1' ? '5 KWh' : kitMatch[2] === '2' ? '10 KWh' : '-';
-            }
+      anneeRentable = cumul + 1;
+      const totalDiff = value.reduce(
+        (sum, row) => sum + (Number(row.diff) || 0),
+        0
+      );
+      const totalRevente = value.reduce(
+        (sum, row) => sum + (Number(row.reventeEstimee) || 0),
+        0
+      );
+      gainTotal20ans = (totalDiff + totalRevente).toLocaleString() + ' €';
+    }
+  });
+  return [
+    {
+      label: 'Production annuelle',
+      value: etude.prodMoyenneKwh ? etude.prodMoyenneKwh + ' kWh/an' : '-',
+      color: 'linear-gradient(90deg,#2563eb 60%,#60a5fa 100%)',
+      icon: '⚡',
+      valueColor: '#fff',
+      shadow: '0 2px 12px #2563eb33',
+    },
+    {
+      label: 'Année de rentabilité',
+      value: anneeRentable || etude.amortissement || '-',
+      color: 'linear-gradient(90deg,#bfa100 60%,#fbbf24 100%)',
+      icon: '⏳',
+      valueColor: '#fff',
+      shadow: '0 2px 12px #bfa10033',
+    },
+    {
+      label: 'Gain total sur 20 ans',
+      value: gainTotal20ans || '-',
+      color: 'linear-gradient(90deg,#16a34a 60%,#4ade80 100%)',
+      icon: '💰',
+      valueColor: '#fff',
+      shadow: '0 2px 12px #16a34a33',
+    },
+    {
+      label: 'Prime EDF versée',
+      value: primeValueNum ? primeValueNum.toLocaleString() + ' €' : '-',
+      color: 'linear-gradient(90deg,#f59e42 60%,#fbbf24 100%)',
+      icon: '🎁',
+      valueColor: '#fff',
+      shadow: '0 2px 12px #f59e4233',
+    },
+    {
+      label: 'Puissance & Stockage',
+      value: (() => {
+        let puissance = '-';
+        let stockage = '-';
+        if (etude.kit) {
+          const kitMatch = String(etude.kit).match(/(\d+)KWh-(\d+)/);
+          if (kitMatch) {
+            puissance = kitMatch[1] + ' KWh';
+            stockage =
+              kitMatch[2] === '1'
+                ? '5 KWh'
+                : kitMatch[2] === '2'
+                ? '10 KWh'
+                : '-';
           }
-          return puissance + (stockage !== '-' ? ' / ' + stockage : '');
-        })(),
-        color: 'linear-gradient(90deg,#0ea5e9 60%,#38bdf8 100%)',
-        icon: '🔋',
-        valueColor: '#fff',
-        shadow: '0 2px 12px #0ea5e933',
-      },
-    ];
-  }
-
+        }
+        return puissance + (stockage !== '-' ? ' / ' + stockage : '');
+      })(),
+      color: 'linear-gradient(90deg,#0ea5e9 60%,#38bdf8 100%)',
+      icon: '🔋',
+      valueColor: '#fff',
+      shadow: '0 2px 12px #0ea5e933',
+    },
+  ];
+}
 
 // Page "Faire une proposition" pour importer et gérer des devis
 const FaireProposition = () => {
@@ -492,21 +667,14 @@ const FaireProposition = () => {
         100
       ).toFixed(1);
     }
-    // Génération des tags visuels pour le mail (centralisé)
-    const tags = getVisualTags(etude);
-    let tagsHtml = `<div style='display:flex;gap:16;flex-wrap:wrap;margin:24px 0 18px 0;'>` +
-      tags.map(tag => `
-        <span style='background:${tag.color};color:#fff;border-radius:16px;padding:14px 28px;font-weight:500;font-size:16px;box-shadow:0 2px 12px #0002;display:inline-flex;align-items:center;margin-right:10px;margin-bottom:8px;border:2px solid #fff2;'>
-          <span style='font-size:28px;margin-right:14px;'>${tag.icon}</span>
-          <span style='font-size:15px;opacity:0.85;'>${tag.label}</span>
-          <span style='font-size:22px;font-weight:700;margin-left:14px;color:#fff;text-shadow:0 2px 8px #0002;'>${tag.value}</span>
-        </span>
-      `).join('') + '</div>';
-    // Ajout des tags tout en haut du mail
-    mail = mail.replace(
-      /(Monsieur et Madame [^\n]+)/,
-      (match) => match + `\n${tagsHtml}\n`
-    );
+    // Ajout des tags/jauges HTML stylisés avant le texte principal du mail
+    mail =
+      getTagsJaugesHtml(etude, {
+        production: productionEstimee,
+        anneeRentabilite: anneeRentable,
+      }) +
+      '\n' +
+      mail;
     // Suppression des guillemets autour des données dynamiques dans le mail
     mail = mail.replace(/«\s*([^»]+)\s*»/g, '$1');
     setMailContent(mail);
@@ -1201,8 +1369,14 @@ const FaireProposition = () => {
     } catch (err) {
       // Affiche un message spécifique si le mot de passe SMTP est incorrect
       const errMsg = err?.message || String(err);
-      if (errMsg.toLowerCase().includes('auth') || errMsg.toLowerCase().includes('authentication failed') || errMsg.toLowerCase().includes('535')) {
-        alert('Mot de passe de la boîte mail incorrect ou refusé par le serveur SMTP.');
+      if (
+        errMsg.toLowerCase().includes('auth') ||
+        errMsg.toLowerCase().includes('authentication failed') ||
+        errMsg.toLowerCase().includes('535')
+      ) {
+        alert(
+          'Mot de passe de la boîte mail incorrect ou refusé par le serveur SMTP.'
+        );
       } else {
         alert('Erreur lors de l’envoi du mail : ' + errMsg);
       }
@@ -2374,18 +2548,30 @@ const FaireProposition = () => {
                       border: '2px solid #fff2',
                       transition: 'transform 0.2s',
                     }}
-                    onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.04)'}
-                    onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+                    onMouseEnter={(e) =>
+                      (e.currentTarget.style.transform = 'scale(1.04)')
+                    }
+                    onMouseLeave={(e) =>
+                      (e.currentTarget.style.transform = 'scale(1)')
+                    }
                   >
-                    <span style={{ fontSize: 28, marginRight: 14 }}>{tag.icon}</span>
-                    <span style={{ fontSize: 15, opacity: 0.85 }}>{tag.label}</span>
-                    <span style={{
-                      fontSize: 22,
-                      fontWeight: 700,
-                      marginLeft: 14,
-                      color: tag.valueColor,
-                      textShadow: '0 2px 8px #0002',
-                    }}>{tag.value}</span>
+                    <span style={{ fontSize: 28, marginRight: 14 }}>
+                      {tag.icon}
+                    </span>
+                    <span style={{ fontSize: 15, opacity: 0.85 }}>
+                      {tag.label}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 22,
+                        fontWeight: 700,
+                        marginLeft: 14,
+                        color: tag.valueColor,
+                        textShadow: '0 2px 8px #0002',
+                      }}
+                    >
+                      {tag.value}
+                    </span>
                   </span>
                 )),
                 ...jauges.map((jauge, idx) => (
@@ -2406,20 +2592,36 @@ const FaireProposition = () => {
                       marginTop: 2,
                     }}
                   >
-                    <span style={{ fontSize: 26, marginRight: 10 }}>{jauge.icon}</span>
-                    <span style={{ marginRight: 10 }}>{Number(jauge.percent).toFixed(1)}% {jauge.label}</span>
-                    <span style={{
-                      fontSize: 15,
-                      fontWeight: 400,
-                      marginLeft: 16,
-                      color: '#e0e7ff',
-                      textAlign: 'right',
-                    }}>{jauge.kwh} kWh<br /><span style={{ color: '#fff', fontWeight: 600 }}>{jauge.euros} {idx === 0 ? '€ économisés' : '€ gagnés'}</span></span>
+                    <span style={{ fontSize: 26, marginRight: 10 }}>
+                      {jauge.icon}
+                    </span>
+                    <span style={{ marginRight: 10 }}>
+                      {Number(jauge.percent).toFixed(1)}% {jauge.label}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 15,
+                        fontWeight: 400,
+                        marginLeft: 16,
+                        color: '#e0e7ff',
+                        textAlign: 'right',
+                      }}
+                    >
+                      {jauge.kwh} kWh
+                      <br />
+                      <span style={{ color: '#fff', fontWeight: 600 }}>
+                        {jauge.euros} {idx === 0 ? '€ économisés' : '€ gagnés'}
+                      </span>
+                    </span>
                   </div>
                 )),
               ];
             })()}
-            <div dangerouslySetInnerHTML={{ __html: mailContent.replace(/\n/g, '<br />') }} />
+            <div
+              dangerouslySetInnerHTML={{
+                __html: mailContent.replace(/\n/g, '<br />'),
+              }}
+            />
             {includeTableInMail &&
               selectedClient &&
               (() => {
