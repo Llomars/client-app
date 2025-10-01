@@ -957,7 +957,10 @@ const FaireProposition = () => {
       ).toFixed(1);
     }
     // Jauge design moderne et esthétique
-    let jaugeHtml = '';
+    let jaugeHtml = getTagsJaugesHtml(etude, {
+      production: productionEstimee,
+      anneeRentabilite: anneeRentable,
+    });
     // Ajout du jauge tout en haut du mail
     mail = mail.replace(
       /(Monsieur et Madame [^\n]+)/,
