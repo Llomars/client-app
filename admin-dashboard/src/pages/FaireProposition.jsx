@@ -1,3 +1,9 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { getAuth } from 'firebase/auth';
+import { getFirestore, getDocs, collection, addDoc } from 'firebase/firestore';
+import { getApp } from 'firebase/app';
+import * as XLSX from 'xlsx';
+
 // Fonction utilitaire pour générer le HTML des tags/jauges (pour mail et aperçu)
 function getTagsJaugesHtml(etude, etudeData) {
   // Tags
@@ -161,11 +167,6 @@ function getTagsJaugesHtml(etude, etudeData) {
   html += '</div>';
   return html;
 }
-import React, { useState, useEffect, useCallback } from 'react';
-import { getAuth } from 'firebase/auth';
-import { getFirestore, getDocs, collection, addDoc } from 'firebase/firestore';
-import { getApp } from 'firebase/app';
-import * as XLSX from 'xlsx';
 
 // Fonction utilitaire pour générer les tags visuels (données + design)
 function getVisualTags(etude) {
