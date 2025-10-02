@@ -20,9 +20,15 @@ import { db } from '../firebaseConfig';
 // db est importé depuis firebaseConfig.js (déjà initialisé)
 
 function Calculateur() {
+  // Permet de forcer le refresh de la simulation
+  const [refreshKey, setRefreshKey] = useState(0);
   // ...existing hooks...
   // Paiement comptant
   const [paiementComptant, setPaiementComptant] = useState(false);
+  // Champs séparés pour pertes
+  const [pvLoss, setPvLoss] = useState(3); // Pertes PV (%)
+  const [cableLoss, setCableLoss] = useState(2); // Pertes câbles (%)
+  const [inverterLoss, setInverterLoss] = useState(9); // Pertes onduleur (%)
   // --- Chargement images pour PDF (logo, pétales, backend) ---
   useEffect(() => {
     if (!window.petalesPngDataUrl) {
@@ -1364,7 +1370,9 @@ function Calculateur() {
         // Ajoute angle (inclinaison) et aspect (azimut) à la requête
         const azimut = orientationAzimut[orientation] ?? 180;
         const angle = inclinaison;
-        let urlPVGIS = `https://re.jrc.ec.europa.eu/api/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-ERA5&peakpower=${kw}&loss=14&angle=${angle}&aspect=${azimut}&outputformat=json`;
+        const totalLoss =
+          Number(pvLoss) + Number(cableLoss) + Number(inverterLoss);
+  let urlPVGIS = `https://re.jrc.ec.europa.eu/api/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-SARAH3&peakpower=${kw}&loss=${totalLoss}&angle=${angle}&aspect=${azimut}&outputformat=json`;
         // Utilise le proxy local en dev, proxy Vercel en prod
         // Utilise toujours le proxy Vercel en production comme en dev
         let proxyUrl = `https://pvgis-proxy-next-clean.vercel.app/api/pvgis?url=${encodeURIComponent(
@@ -1386,6 +1394,7 @@ function Calculateur() {
           } else {
             kwh = 0;
           }
+          console.log('Production annuelle brute PVGIS (E_y):', kwh);
           if (!kwh) {
             console.warn('PVGIS ERA5 no kwh, response:', res.data);
           }
@@ -1393,7 +1402,27 @@ function Calculateur() {
           setLoadingPVGIS(false);
         } catch (err) {
           // Si PVcalc échoue, tente v5_2/PVcalc
-          urlPVGIS = `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-ERA5&peakpower=${kw}&loss=14&angle=${angle}&aspect=${azimut}&outputformat=json`;
+          urlPVGIS = `https://re.jrc.ec.europa.eu/api/v5_2/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-SARAH3&peakpower=${kw}&loss=${totalLoss}&angle=${angle}&aspect=${azimut}&outputformat=json`;
+          // À placer à l'endroit pertinent dans le formulaire/calculateur (dans le JSX)
+          /*
+  <div style={{ margin: '18px 0', display: 'flex', gap: 24 }}>
+    <div>
+      <label>Pertes PV (%)</label>
+      <input type="number" min={0} max={10} value={pvLoss} onChange={e => setPvLoss(e.target.value)} style={{ width: 60 }} />
+    </div>
+    <div>
+      <label>Pertes câbles (%)</label>
+      <input type="number" min={0} max={10} value={cableLoss} onChange={e => setCableLoss(e.target.value)} style={{ width: 60 }} />
+    </div>
+    <div>
+      <label>Pertes onduleur (%)</label>
+      <input type="number" min={0} max={15} value={inverterLoss} onChange={e => setInverterLoss(e.target.value)} style={{ width: 60 }} />
+    </div>
+    <div style={{ fontWeight: 600, color: '#2563eb', marginLeft: 18 }}>
+      Total pertes : {Number(pvLoss) + Number(cableLoss) + Number(inverterLoss)} %
+    </div>
+  </div>
+  */
           proxyUrl = `https://pvgis-proxy-next-clean.vercel.app/api/pvgis?url=${encodeURIComponent(
             urlPVGIS
           )}`;
@@ -1428,7 +1457,16 @@ function Calculateur() {
     }
     fetchPVGIS();
     // eslint-disable-next-line
-  }, [coords, kit, inclinaison, orientation]);
+  }, [
+    coords,
+    kit,
+    inclinaison,
+    orientation,
+    pvLoss,
+    cableLoss,
+    inverterLoss,
+    refreshKey,
+  ]);
 
   // Always call hooks at the top level
   useEffect(() => {
@@ -2224,6 +2262,23 @@ function Calculateur() {
             }}
           >
             Simulation centrale photovoltaïque
+            <button
+              style={{
+                marginLeft: 24,
+                padding: '8px 18px',
+                fontWeight: 700,
+                fontSize: 16,
+                background: '#6366f1',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 8,
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px #c7d2fe',
+              }}
+              onClick={() => setRefreshKey((k) => k + 1)}
+            >
+              Rafraîchir la simulation
+            </button>
           </h2>
           {/* Bloc moderne de saisie des paramètres */}
           <div
@@ -2240,6 +2295,88 @@ function Calculateur() {
               border: '1.5px solid #c7d2fe',
             }}
           >
+            {/* Champs pertes PV, câbles, onduleur */}
+            <div style={{ gridColumn: '1 / span 2', marginBottom: 12 }}>
+              <div style={{ display: 'flex', gap: 24, alignItems: 'center' }}>
+                <div>
+                  <label
+                    style={{ fontWeight: 700, color: '#3730a3', fontSize: 15 }}
+                  >
+                    Pertes PV (%)
+                  </label>
+                  <br />
+                  <input
+                    type="number"
+                    min={0}
+                    max={10}
+                    value={pvLoss}
+                    onChange={(e) => setPvLoss(e.target.value)}
+                    style={{
+                      width: 60,
+                      fontSize: 16,
+                      borderRadius: 8,
+                      border: '1.5px solid #6366f1',
+                      padding: 6,
+                    }}
+                  />
+                </div>
+                <div>
+                  <label
+                    style={{ fontWeight: 700, color: '#3730a3', fontSize: 15 }}
+                  >
+                    Pertes câbles (%)
+                  </label>
+                  <br />
+                  <input
+                    type="number"
+                    min={0}
+                    max={10}
+                    value={cableLoss}
+                    onChange={(e) => setCableLoss(e.target.value)}
+                    style={{
+                      width: 60,
+                      fontSize: 16,
+                      borderRadius: 8,
+                      border: '1.5px solid #6366f1',
+                      padding: 6,
+                    }}
+                  />
+                </div>
+                <div>
+                  <label
+                    style={{ fontWeight: 700, color: '#3730a3', fontSize: 15 }}
+                  >
+                    Pertes onduleur (%)
+                  </label>
+                  <br />
+                  <input
+                    type="number"
+                    min={0}
+                    max={15}
+                    value={inverterLoss}
+                    onChange={(e) => setInverterLoss(e.target.value)}
+                    style={{
+                      width: 60,
+                      fontSize: 16,
+                      borderRadius: 8,
+                      border: '1.5px solid #6366f1',
+                      padding: 6,
+                    }}
+                  />
+                </div>
+                <div
+                  style={{
+                    fontWeight: 700,
+                    color: '#2563eb',
+                    marginLeft: 18,
+                    fontSize: 16,
+                  }}
+                >
+                  Total pertes :{' '}
+                  {Number(pvLoss) + Number(cableLoss) + Number(inverterLoss)} %
+                </div>
+              </div>
+            </div>
             {/* Kit */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               <label
