@@ -25,6 +25,8 @@ function Calculateur() {
   // ...existing hooks...
   // Paiement comptant
   const [paiementComptant, setPaiementComptant] = useState(false);
+  // Option réinjection prime dans le financement
+  const [reinjectPrime, setReinjectPrime] = useState(true);
   // Champs séparés pour pertes
   const [pvLoss, setPvLoss] = useState(3); // Pertes PV (%)
   const [cableLoss, setCableLoss] = useState(2); // Pertes câbles (%)
@@ -1283,7 +1285,7 @@ function Calculateur() {
       // Si encore en remboursement
       if (moisRestant > 0) {
         // À partir de la 2e année, on déduit la prime du solde restant (une seule fois)
-        if (i === 1 && prime && !primeUtilisee) {
+        if (i === 1 && prime && !primeUtilisee && reinjectPrime) {
           montantRestant = Math.max(0, montantRestant - prime);
           // Recalcule la mensualité sur le solde restant et la durée restante
           const t = tauxRestant / 100 / 12;
@@ -1341,6 +1343,7 @@ function Calculateur() {
     prime,
     kit,
     modeAugmentation,
+    reinjectPrime,
   ]);
 
   // Requête PVGIS à chaque changement de coords ou kit
@@ -2892,7 +2895,7 @@ function Calculateur() {
           {/* Bloc supprimé : résultats détaillés sous la carte, on garde seulement les 4 cases infos clés */}
           {/* Tableau de rentabilité sur 20 ans */}
           <div style={{ marginTop: 24 }}>
-            <div style={{ display: 'flex', gap: 12, marginBottom: 12 }}>
+            <div style={{ display: 'flex', gap: 12, marginBottom: 12, alignItems: 'center' }}>
               <button
                 onClick={() => setModeAugmentation(true)}
                 style={{
@@ -2925,6 +2928,19 @@ function Calculateur() {
               >
                 Sans augmentation
               </button>
+              {!paiementComptant && (
+                <div style={{ marginLeft: 18, display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <label style={{ fontWeight: 700, color: '#3730a3', fontSize: 15 }}>
+                    Réinjecter la prime dans le financement
+                  </label>
+                  <input
+                    type="checkbox"
+                    checked={reinjectPrime}
+                    onChange={e => setReinjectPrime(e.target.checked)}
+                    style={{ width: 22, height: 22, accentColor: '#6366f1', cursor: 'pointer' }}
+                  />
+                </div>
+              )}
             </div>
             <h4 style={{ color: '#3730a3', fontWeight: 700, fontSize: 20 }}>
               Tableau de rentabilité (20 ans){' '}
@@ -3407,8 +3423,8 @@ function Calculateur() {
           >
             💸 Simulation financement
           </h3>
-          {/* Bouton pour choisir le mode de paiement */}
-          <div style={{ display: 'flex', gap: 12, marginBottom: 18 }}>
+          {/* Bouton pour choisir le mode de paiement + toggle réinjection prime */}
+          <div style={{ display: 'flex', gap: 12, marginBottom: 18, alignItems: 'center' }}>
             <button
               onClick={() => setPaiementComptant(false)}
               style={{
@@ -3441,6 +3457,7 @@ function Calculateur() {
             >
               Paiement comptant
             </button>
+            {/* ...rien ici, le bouton est déplacé au-dessus du tableau de rentabilité... */}
           </div>
           {/* Affichage conditionnel selon le mode de paiement */}
           {!paiementComptant ? (

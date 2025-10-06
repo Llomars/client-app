@@ -17,6 +17,7 @@ import Logistique from './pages/Logistique.jsx';
 import Calculateur from './pages/Calculateur.jsx';
 import Relances from './pages/Relances.jsx';
 import FaireProposition from './pages/FaireProposition.jsx';
+import ClientsChauds from './pages/ClientsChauds.jsx';
 
 console.log('🔍 Performance.jsx chargé');
 
@@ -41,6 +42,7 @@ export default function App() {
         <Route path="/calculateur" element={<Calculateur />} />
         <Route path="/relances" element={<Relances />} />
         <Route path="/faire-proposition" element={<FaireProposition />} />
+        <Route path="/clients-chauds" element={<ClientsChauds />} />
       </Routes>
     </Router>
   );

@@ -143,21 +143,42 @@ export default function Header() {
           )}
           {/* Lien Calculateur pour tous les rôles autorisés */}
           {['admin', 'manager', 'commercial', 'phoneur'].includes(role) && (
-            <Link
-              to="/calculateur"
-              style={{
-                background: '#f43f5e',
-                padding: '8px 16px',
-                borderRadius: '8px',
-                color: '#fff',
-                fontWeight: '500',
-                textDecoration: 'none',
-                border: 'none',
-                cursor: 'pointer',
-              }}
-            >
-              📊 Calculateur
-            </Link>
+            <>
+              <Link
+                to="/calculateur"
+                style={{
+                  background: '#f43f5e',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  fontWeight: '500',
+                  textDecoration: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                📊 Calculateur
+              </Link>
+              <Link
+                to="/clients-chauds"
+                style={{
+                  background: '#f59e42',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  fontWeight: '500',
+                  textDecoration: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}
+              >
+                <span role="img" aria-label="clients chauds" style={{ fontSize: 20 }}>🔥</span>
+                Clients chauds
+              </Link>
+            </>
           )}
           <Link
             to="/relances"
