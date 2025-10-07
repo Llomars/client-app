@@ -216,11 +216,12 @@ function Calculateur() {
         let synthY = blockY + blockHeight + 8;
         docPdf.setFontSize(11);
         docPdf.setTextColor(245, 158, 11);
-        docPdf.text('Adresse :', 13, synthY);
-        docPdf.setTextColor(0, 0, 0);
-        docPdf.setFont('helvetica', 'bold');
-        docPdf.text(adresse ? adresse : '-', 32, synthY, { maxWidth: 160 });
-        docPdf.setFont('helvetica', 'normal');
+  docPdf.text('Adresse :', 13, synthY);
+  docPdf.setTextColor(0, 0, 0);
+  docPdf.setFont('helvetica', 'bold');
+  const fullAddress = `${streetNumber ? streetNumber + ' ' : ''}${street ? street + ', ' : ''}${city ? city + ', ' : ''}${country ? country : ''}`;
+  docPdf.text(fullAddress.trim() ? fullAddress : '-', 32, synthY, { maxWidth: 160 });
+  docPdf.setFont('helvetica', 'normal');
         synthY += 8;
         // Synthèse (juste sous l'adresse)
         const cumulRevente = rentabilite.reduce(
@@ -416,30 +417,6 @@ function Calculateur() {
       const totalEdf = rentabilite.reduce(
         (acc, row) => acc + (row.coutEdf || 0),
         0
-      );
-      const totalCentrale = rentabilite.reduce(
-        (acc, row) => acc + (row.coutCentrale || 0),
-        0
-      );
-      docPdf.setFont('helvetica', 'bold');
-      docPdf.setTextColor(30, 64, 175);
-      docPdf.text(`${String(totalEdf).replace(/\//g, '')} €`, 28, rowY2 + 5);
-      docPdf.text(
-        `${String(totalCentrale).replace(/\//g, '')} €`,
-        52,
-        rowY2 + 5
-      );
-      docPdf.setTextColor(191, 161, 0);
-      docPdf.text(
-        `${String(totalRevente).replace(/\//g, '')} €`,
-        82,
-        rowY2 + 5
-      );
-      docPdf.setTextColor(16, 185, 129);
-      docPdf.text(
-        `${totalDiff ? String(totalDiff).replace(/\//g, '') + ' €' : '-'}`,
-        108,
-        rowY2 + 5
       );
       // Message rassurant
       let msgY = rowY2 + 18;
@@ -1144,7 +1121,10 @@ function Calculateur() {
   const [montantFinance, setMontantFinance] = useState(0);
   const [inclinaison, setInclinaison] = useState(20); // valeur par défaut
   const [orientation, setOrientation] = useState('Sud');
-  const [adresse, setAdresse] = useState('');
+  const [country, setCountry] = useState('France');
+  const [city, setCity] = useState('');
+  const [street, setStreet] = useState('');
+  const [streetNumber, setStreetNumber] = useState('');
   const [loadingAdresse, setLoadingAdresse] = useState(false);
   const [coords, setCoords] = useState({ lat: -21.1151, lng: 55.5364 }); // Centre Réunion
   const [adresseError, setAdresseError] = useState('');
@@ -1202,6 +1182,32 @@ function Calculateur() {
   })();
 
   // --- useEffects ---
+  // Met à jour le marqueur sur la carte dès que l'adresse change
+  useEffect(() => {
+    // Construit l'adresse complète
+    const fullAddress = `${streetNumber ? streetNumber + ' ' : ''}${street ? street + ', ' : ''}${city ? city + ', ' : ''}${country ? country : ''}`;
+    if (fullAddress.trim().length > 5) {
+      setLoadingAdresse(true);
+      setAdresseError('');
+      // Appel à Nominatim pour géocoder
+      axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}`)
+        .then(res => {
+          if (res.data && res.data.length > 0) {
+            const { lat, lon } = res.data[0];
+            setCoords({ lat: parseFloat(lat), lng: parseFloat(lon) });
+            setAdresseError('');
+          } else {
+            setAdresseError('Adresse non trouvée');
+          }
+        })
+        .catch(() => {
+          setAdresseError('Erreur de géolocalisation');
+        })
+        .finally(() => {
+          setLoadingAdresse(false);
+        });
+    }
+  }, [country, city, street, streetNumber]);
   useEffect(() => {
     const auth = getAuth();
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -1524,15 +1530,24 @@ function Calculateur() {
         const res = await axios.get(
           `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=fr`
         );
-        if (res.data && res.data.display_name) {
-          setAdresse(res.data.display_name);
+        if (res.data && res.data.address) {
+          setCountry(res.data.address.country || '');
+          setCity(res.data.address.city || res.data.address.town || res.data.address.village || '');
+          setStreet(res.data.address.road || '');
+          setStreetNumber(res.data.address.house_number || '');
           setAdresseError('');
         } else {
-          setAdresse('');
+          setCountry('');
+          setCity('');
+          setStreet('');
+          setStreetNumber('');
           setAdresseError('Adresse non trouvée');
         }
       } catch (err) {
-        setAdresse('');
+        setCountry('');
+        setCity('');
+        setStreet('');
+        setStreetNumber('');
         setAdresseError("Erreur lors de la récupération de l'adresse");
       }
     });
@@ -2003,7 +2018,10 @@ function Calculateur() {
                   kit,
                   inclinaison,
                   orientation,
-                  adresse,
+                  country,
+                  city,
+                  street,
+                  streetNumber,
                   coords,
                   prixCentrale,
                   prixNet,
@@ -2635,70 +2653,41 @@ function Calculateur() {
               }}
             >
               <label
-                style={{
-                  color: '#6366f1',
-                  fontWeight: 800,
-                  fontSize: 16,
-                  marginBottom: 2,
-                }}
-              >
-                <span role="img" aria-label="Adresse">
-                  📍
-                </span>{' '}
-                Adresse
+                style={{ color: '#6366f1', fontWeight: 800, fontSize: 16, marginBottom: 2 }}>
+                <span role="img" aria-label="Adresse">📍</span> Adresse
               </label>
-              <input
-                type="text"
-                value={adresse}
-                onChange={(e) => setAdresse(e.target.value)}
-                placeholder="Cliquez sur la carte ou saisissez une adresse"
-                style={{
-                  padding: 12,
-                  borderRadius: 10,
-                  border: '2px solid #6366f1',
-                  fontSize: 16,
-                  background: '#fff',
-                  color: '#3730a3',
-                  fontWeight: 700,
-                  width: '100%',
-                  boxShadow: '0 2px 8px #e0e7ff',
-                  outline: 'none',
-                  transition: 'border 0.2s',
-                }}
-                onBlur={async (e) => {
-                  const value = e.target.value;
-                  if (value && value.length > 5) {
-                    setLoadingAdresse(true);
-                    setAdresseError('');
-                    try {
-                      const res = await axios.get(
-                        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
-                          value
-                        )}`
-                      );
-                      if (res.data && res.data.length > 0) {
-                        const { lat, lon, display_name } = res.data[0];
-                        setCoords({
-                          lat: parseFloat(lat),
-                          lng: parseFloat(lon),
-                        });
-                        setAdresse(display_name);
-                      } else {
-                        setAdresseError('Adresse non trouvée');
-                      }
-                    } catch (err) {
-                      setAdresseError('Erreur de géolocalisation');
-                    }
-                    setLoadingAdresse(false);
-                  }
-                }}
-              />
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <input
+                  type="text"
+                  value={country}
+                  onChange={e => setCountry(e.target.value)}
+                  placeholder="Pays"
+                  style={{ padding: 8, borderRadius: 8, border: '2px solid #6366f1', fontSize: 14, width: 100 }}
+                />
+                <input
+                  type="text"
+                  value={city}
+                  onChange={e => setCity(e.target.value)}
+                  placeholder="Ville"
+                  style={{ padding: 8, borderRadius: 8, border: '2px solid #6366f1', fontSize: 14, width: 120 }}
+                />
+                <input
+                  type="text"
+                  value={street}
+                  onChange={e => setStreet(e.target.value)}
+                  placeholder="Rue"
+                  style={{ padding: 8, borderRadius: 8, border: '2px solid #6366f1', fontSize: 14, width: 180 }}
+                />
+                <input
+                  type="text"
+                  value={streetNumber}
+                  onChange={e => setStreetNumber(e.target.value)}
+                  placeholder="Numéro"
+                  style={{ padding: 8, borderRadius: 8, border: '2px solid #6366f1', fontSize: 14, width: 70 }}
+                />
+              </div>
               {adresseError && (
-                <span
-                  style={{ color: '#dc2626', marginLeft: 4, fontWeight: 700 }}
-                >
-                  {adresseError}
-                </span>
+                <span style={{ color: '#dc2626', marginLeft: 4, fontWeight: 700 }}>{adresseError}</span>
               )}
             </div>
           </div>
