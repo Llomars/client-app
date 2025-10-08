@@ -543,7 +543,7 @@ export default function MesClients() {
         voitureElec: false,
         caveVin: false,
         consolesPc: false,
-        brasseurAir: false,
+        brasseurAir: 0,
         autres: '',
         profilClient: [],
       });
@@ -704,7 +704,10 @@ export default function MesClients() {
     { key: 'tele', label: 'Télé', type: 'bool', icon: '📺' },
     { key: 'plaque', label: 'Plaque électrique', type: 'bool', icon: '🍳' },
     { key: 'frigo', label: 'Frigo', type: 'number', icon: '🧊' },
-    { key: 'clims', label: 'Clims', type: 'number', icon: '🌬️' }, // Remplace congélateur par clims (nombre)
+    { key: 'laveVaisselle', label: 'Lave-vaisselle', type: 'bool', icon: '🍽️' },
+    { key: 'machineLaver', label: 'Machine à laver', type: 'bool', icon: '🧺' },
+    { key: 'congelateur', label: 'Congélateur', type: 'number', icon: '❄️' },
+    { key: 'clims', label: 'Clims', type: 'number', icon: '🌬️' },
     { key: 'piscine', label: 'Piscine', type: 'bool', icon: '🏊' },
     { key: 'pompeChaleur', label: 'Pompe à chaleur', type: 'bool', icon: '🔥' },
     { key: 'jacuzzi', label: 'Jacuzzi', type: 'bool', icon: '🛁' },
@@ -716,7 +719,7 @@ export default function MesClients() {
     },
     { key: 'caveVin', label: 'Cave à vin', type: 'bool', icon: '🍷' },
     { key: 'consolesPc', label: 'Consoles ou PC', type: 'bool', icon: '🎮' },
-    { key: 'brasseurAir', label: "Brasseur d'air", type: 'bool', icon: '🌀' },
+    { key: 'brasseurAir', label: "Brasseur d'air", type: 'number', icon: '🌀' },
     {
       key: 'resistanceElec',
       label: 'Résistance électrique',
@@ -2366,6 +2369,43 @@ export default function MesClients() {
                                     }}
                                   />
                                 </div>
+                                {/* Brasseur d'air */}
+                                <div
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                  }}
+                                >
+                                  <span style={{ fontSize: 22 }}>
+                                    {
+                                      etudePersoElements.find(
+                                        (e) => e.key === 'brasseurAir'
+                                      )?.icon
+                                    }
+                                  </span>
+                                  <label style={{ fontWeight: 600 }}>
+                                    Brasseur d'air :
+                                  </label>
+                                  <input
+                                    type="number"
+                                    min={0}
+                                    value={etudePerso?.brasseurAir || 0}
+                                    onChange={(e) =>
+                                      handleChangeEtudePerso(
+                                        'brasseurAir',
+                                        Number(e.target.value)
+                                      )
+                                    }
+                                    style={{
+                                      width: 60,
+                                      padding: 6,
+                                      borderRadius: 6,
+                                      border: '1px solid #d1d5db',
+                                      fontSize: 15,
+                                    }}
+                                  />
+                                </div>
                               </div>
                               {/* Champ Autre */}
                               <div style={{ marginTop: 18 }}>
@@ -3293,7 +3333,11 @@ export default function MesClients() {
             {/* Champ date pour RDV pris tout en haut */}
             <div style={{ marginBottom: 18 }}>
               <span
-                style={{ fontWeight: 500, color: '#64748b', marginRight: 8 }}
+                style={{
+                  fontWeight: 500,
+                  color: '#64748b',
+                  marginRight: 8,
+                }}
               >
                 Date RDV pris :
               </span>
@@ -3326,7 +3370,9 @@ export default function MesClients() {
               'installe',
             ].map((key) => (
               <div key={key} style={{ marginBottom: 10 }}>
-                <label style={{ fontWeight: 600, marginRight: 12 }}>
+                <label
+                  style={{ fontWeight: 600, marginRight: 12 }}
+                >
                   <input
                     type="checkbox"
                     checked={!!etatProjet[showEtatProjetId]?.[key]}
@@ -3376,7 +3422,9 @@ export default function MesClients() {
                 )}
               </div>
             ))}
-            <div style={{ display: 'flex', gap: 16, marginTop: 24 }}>
+            <div
+              style={{ display: 'flex', gap: 16, marginTop: 24 }}
+            >
               <button
                 onClick={() => handleSaveEtatProjet(showEtatProjetId)}
                 style={{
