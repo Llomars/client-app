@@ -216,12 +216,16 @@ function Calculateur() {
         let synthY = blockY + blockHeight + 8;
         docPdf.setFontSize(11);
         docPdf.setTextColor(245, 158, 11);
-  docPdf.text('Adresse :', 13, synthY);
-  docPdf.setTextColor(0, 0, 0);
-  docPdf.setFont('helvetica', 'bold');
-  const fullAddress = `${streetNumber ? streetNumber + ' ' : ''}${street ? street + ', ' : ''}${city ? city + ', ' : ''}${country ? country : ''}`;
-  docPdf.text(fullAddress.trim() ? fullAddress : '-', 32, synthY, { maxWidth: 160 });
-  docPdf.setFont('helvetica', 'normal');
+        docPdf.text('Adresse :', 13, synthY);
+        docPdf.setTextColor(0, 0, 0);
+        docPdf.setFont('helvetica', 'bold');
+        const fullAddress = `${streetNumber ? streetNumber + ' ' : ''}${
+          street ? street + ', ' : ''
+        }${city ? city + ', ' : ''}${country ? country : ''}`;
+        docPdf.text(fullAddress.trim() ? fullAddress : '-', 32, synthY, {
+          maxWidth: 160,
+        });
+        docPdf.setFont('helvetica', 'normal');
         synthY += 8;
         // Synthèse (juste sous l'adresse)
         const cumulRevente = rentabilite.reduce(
@@ -310,12 +314,18 @@ function Calculateur() {
         docPdf.setFont('helvetica', 'bold');
         docPdf.setFontSize(13);
         docPdf.setTextColor(191, 161, 0);
-        docPdf.text('Cumul revente EDF', col2X + blockW / 2, rowY + 10, {
-          align: 'center',
-        });
+        docPdf.text(
+          "Revente estimée à l'année",
+          col2X + blockW / 2,
+          rowY + 10,
+          {
+            align: 'center',
+          }
+        );
         docPdf.setFont('helvetica', 'bold');
         docPdf.setFontSize(16);
-        docPdf.text(`${cumulRevente} €`, col2X + blockW / 2, rowY + 16, {
+        // Utilise le même calcul que le bloc de vérification
+        docPdf.text(`${gainRevente} €`, col2X + blockW / 2, rowY + 16, {
           align: 'center',
         });
         // Économie totale
@@ -379,17 +389,21 @@ function Calculateur() {
       docPdf.setTextColor(0, 0, 0);
       const tableY2 = 28;
       docPdf.setFillColor(255, 255, 255);
-      docPdf.rect(10, tableY2, 190, 7, 'F');
+      docPdf.rect(10, tableY2, 260, 7, 'F');
       docPdf.setDrawColor(0, 0, 0);
-      docPdf.rect(10, tableY2, 190, 7);
+      docPdf.rect(10, tableY2, 260, 7);
       docPdf.setTextColor(30, 64, 175);
       docPdf.text('Année', 12, tableY2 + 5);
       docPdf.text('Coût EDF', 28, tableY2 + 5);
       docPdf.text('Coût centrale', 52, tableY2 + 5);
       docPdf.text('Revente', 82, tableY2 + 5);
-      docPdf.text('Éco.', 108, tableY2 + 5);
-      docPdf.text('Mens. EDF', 132, tableY2 + 5);
-      docPdf.text('Mens. centrale', 160, tableY2 + 5);
+      docPdf.text('prodMoyenneKwh', 100, tableY2 + 5);
+      docPdf.text('consoJour', 120, tableY2 + 5);
+      docPdf.text('surplus', 140, tableY2 + 5);
+      docPdf.text('prixRevente', 160, tableY2 + 5);
+      docPdf.text('Éco.', 180, tableY2 + 5);
+      docPdf.text('Mens. EDF', 200, tableY2 + 5);
+      docPdf.text('Mens. centrale', 220, tableY2 + 5);
       let rowY2 = tableY2 + 7;
       for (let i = 0; i < rentabilite.length; i++) {
         const row = rentabilite[i];
@@ -399,11 +413,28 @@ function Calculateur() {
         docPdf.text(`${row.coutCentrale} €`, 52, rowY2 + 5);
         docPdf.setTextColor(191, 161, 0);
         docPdf.text(`${row.reventeEstimee} €`, 82, rowY2 + 5);
+        docPdf.setTextColor(0, 0, 0);
+        docPdf.text(`${prodMoyenneKwh}`, 100, rowY2 + 5);
+        docPdf.text(`${consoJour}`, 120, rowY2 + 5);
+        docPdf.text(
+          `${
+            prodMoyenneKwh && consoJour
+              ? (prodMoyenneKwh - consoJour).toFixed(2)
+              : 0
+          }`,
+          140,
+          rowY2 + 5
+        );
+        docPdf.text(
+          `${kit && kit.startsWith('12KWh') ? '0,0894' : '0,1741'}`,
+          160,
+          rowY2 + 5
+        );
         docPdf.setTextColor(16, 185, 129);
-        docPdf.text(`${row.diff} €`, 108, rowY2 + 5);
+        docPdf.text(`${row.diff} €`, 180, rowY2 + 5);
         docPdf.setTextColor(30, 64, 175);
-        docPdf.text(`${row.mensualiteEdf} €`, 132, rowY2 + 5);
-        docPdf.text(`${row.mensualiteCentrale} €`, 160, rowY2 + 5);
+        docPdf.text(`${row.mensualiteEdf} €`, 200, rowY2 + 5);
+        docPdf.text(`${row.mensualiteCentrale} €`, 220, rowY2 + 5);
         rowY2 += 7;
       }
       // Totaux
@@ -1185,13 +1216,20 @@ function Calculateur() {
   // Met à jour le marqueur sur la carte dès que l'adresse change
   useEffect(() => {
     // Construit l'adresse complète
-    const fullAddress = `${streetNumber ? streetNumber + ' ' : ''}${street ? street + ', ' : ''}${city ? city + ', ' : ''}${country ? country : ''}`;
+    const fullAddress = `${streetNumber ? streetNumber + ' ' : ''}${
+      street ? street + ', ' : ''
+    }${city ? city + ', ' : ''}${country ? country : ''}`;
     if (fullAddress.trim().length > 5) {
       setLoadingAdresse(true);
       setAdresseError('');
       // Appel à Nominatim pour géocoder
-      axios.get(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(fullAddress)}`)
-        .then(res => {
+      axios
+        .get(
+          `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+            fullAddress
+          )}`
+        )
+        .then((res) => {
           if (res.data && res.data.length > 0) {
             const { lat, lon } = res.data[0];
             setCoords({ lat: parseFloat(lat), lng: parseFloat(lon) });
@@ -1240,10 +1278,11 @@ function Calculateur() {
       // Estimation revente annuelle sur le surplus, au bon tarif
       let prixRevente = 0.1741;
       if (kit && kit.startsWith('12KWh')) prixRevente = 0.0894;
-      let surplus =
-        prodMoyenneKwh && conso ? prodMoyenneKwh - Number(conso) : 0;
+      // Calcul unique du gain revente, strictement comme le bloc de vérification
+      let surplus = prodMoyenneKwh && consoJour ? prodMoyenneKwh - consoJour : 0;
       if (surplus < 0) surplus = 0;
-      setGainRevente(surplus ? (surplus * prixRevente).toFixed(0) : 0);
+      const gainReventeCalc = (surplus * prixRevente).toFixed(2);
+      setGainRevente(gainReventeCalc);
     } else {
       setPrixCentrale(0);
       setPrixNet(0);
@@ -1251,7 +1290,7 @@ function Calculateur() {
       setPrime(0);
       setGainRevente(0);
     }
-  }, [kit, remise, apport, prodMoyenneKwh, kits, conso]);
+  }, [kit, remise, apport, prodMoyenneKwh, kits, conso, pourcentageJour]);
 
   // Calcul économies annuelles (exemple : prodMoyenneKwh * 0.18€/kWh)
   useEffect(() => {
@@ -1320,18 +1359,22 @@ function Calculateur() {
           moisRestant = 0;
         }
       }
-      // Revente estimée annuelle sur le surplus (production - conso)
+      // Revente estimée annuelle sur le surplus (production - conso JOUR)
       let surplus =
-        prodMoyenneKwh && conso ? prodMoyenneKwh - Number(conso) : 0;
+        prodMoyenneKwh && consoJour ? prodMoyenneKwh - consoJour : 0;
       if (surplus < 0) surplus = 0;
-      const reventeEstimee = surplus ? (surplus * prixRevente).toFixed(0) : 0;
+      // Utilise le calcul direct pour toutes les années
+      const reventeEstimee =
+        prodMoyenneKwh && consoJour
+          ? ((prodMoyenneKwh - consoJour) * prixRevente).toFixed(2)
+          : '0.00';
       rows.push({
         annee,
         coutEdf: Number(coutEdf),
         coutCentrale: Number(coutCentrale),
         prixEdfCts: (prixEdf * 100).toFixed(1),
-        reventeEstimee: Number(reventeEstimee),
-        diff: Number(coutEdf) - Number(coutCentrale),
+        reventeEstimee: gainRevente, // string, affichage identique partout
+        diff: (Number(coutEdf) - Number(coutCentrale)).toFixed(2),
         mensualiteEdf,
         mensualiteCentrale,
       });
@@ -1381,7 +1424,7 @@ function Calculateur() {
         const angle = inclinaison;
         const totalLoss =
           Number(pvLoss) + Number(cableLoss) + Number(inverterLoss);
-  let urlPVGIS = `https://re.jrc.ec.europa.eu/api/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-SARAH3&peakpower=${kw}&loss=${totalLoss}&angle=${angle}&aspect=${azimut}&outputformat=json`;
+        let urlPVGIS = `https://re.jrc.ec.europa.eu/api/PVcalc?lat=${coords.lat}&lon=${coords.lng}&raddatabase=PVGIS-SARAH3&peakpower=${kw}&loss=${totalLoss}&angle=${angle}&aspect=${azimut}&outputformat=json`;
         // Utilise le proxy local en dev, proxy Vercel en prod
         // Utilise toujours le proxy Vercel en production comme en dev
         let proxyUrl = `https://pvgis-proxy-next-clean.vercel.app/api/pvgis?url=${encodeURIComponent(
@@ -1532,7 +1575,12 @@ function Calculateur() {
         );
         if (res.data && res.data.address) {
           setCountry(res.data.address.country || '');
-          setCity(res.data.address.city || res.data.address.town || res.data.address.village || '');
+          setCity(
+            res.data.address.city ||
+              res.data.address.town ||
+              res.data.address.village ||
+              ''
+          );
           setStreet(res.data.address.road || '');
           setStreetNumber(res.data.address.house_number || '');
           setAdresseError('');
@@ -1566,10 +1614,9 @@ function Calculateur() {
       // Estimation revente annuelle sur le surplus, au bon tarif
       let prixRevente = 0.1741;
       if (kit && kit.startsWith('12KWh')) prixRevente = 0.0894;
-      let surplus =
-        prodMoyenneKwh && conso ? prodMoyenneKwh - Number(conso) : 0;
-      if (surplus < 0) surplus = 0;
-      setGainRevente(surplus ? (surplus * prixRevente).toFixed(0) : 0);
+        let surplus = prodMoyenneKwh && consoJour ? prodMoyenneKwh - consoJour : 0;
+        if (surplus < 0) surplus = 0;
+        setGainRevente(surplus ? (surplus * prixRevente).toFixed(2) : '0.00');
     } else {
       setPrixCentrale(0);
       setPrixNet(0);
@@ -1646,17 +1693,13 @@ function Calculateur() {
           moisRestant = 0;
         }
       }
-      // Revente estimée annuelle sur le surplus (production - conso)
-      let surplus =
-        prodMoyenneKwh && conso ? prodMoyenneKwh - Number(conso) : 0;
-      if (surplus < 0) surplus = 0;
-      const reventeEstimee = surplus ? (surplus * prixRevente).toFixed(0) : 0;
+      // Revente estimée annuelle : toujours la valeur unique de gainRevente
       rows.push({
         annee,
         coutEdf: Number(coutEdf),
         coutCentrale: Number(coutCentrale),
         prixEdfCts: (prixEdf * 100).toFixed(1),
-        reventeEstimee: Number(reventeEstimee),
+        reventeEstimee: Number(gainRevente),
         diff: Number(coutEdf) - Number(coutCentrale),
         mensualiteEdf,
         mensualiteCentrale,
@@ -2261,6 +2304,41 @@ function Calculateur() {
         }}
       >
         {/* Colonne principale infos centrale/client */}
+        {/* DEBUG CALCUL REVENTE */}
+        <div
+          style={{
+            background: '#fffbe6',
+            border: '1px solid #ffe58f',
+            borderRadius: 8,
+            padding: 12,
+            marginBottom: 18,
+          }}
+        >
+          <strong>Vérification calcul revente :</strong>
+          <br />
+          Production annuelle estimée : <b>{prodMoyenneKwh} kWh</b>
+          <br />
+          Consommation jour annuelle : <b>{consoJour} kWh</b>
+          <br />
+          Surplus (prod - conso jour) :{' '}
+          <b>
+            {prodMoyenneKwh && consoJour ? prodMoyenneKwh - consoJour : 0} kWh
+          </b>
+          <br />
+          Tarif revente :{' '}
+          <b>{kit && kit.startsWith('12KWh') ? '0,0894' : '0,1741'} €/kWh</b>
+          <br />
+          Gain revente estimé :{' '}
+          <b>
+            {prodMoyenneKwh && consoJour
+              ? (
+                  (prodMoyenneKwh - consoJour) *
+                  (kit && kit.startsWith('12KWh') ? 0.0894 : 0.1741)
+                ).toFixed(2)
+              : '0.00'}{' '}
+            €
+          </b>
+        </div>
         <div
           style={{
             flex: 2,
@@ -2653,41 +2731,78 @@ function Calculateur() {
               }}
             >
               <label
-                style={{ color: '#6366f1', fontWeight: 800, fontSize: 16, marginBottom: 2 }}>
-                <span role="img" aria-label="Adresse">📍</span> Adresse
+                style={{
+                  color: '#6366f1',
+                  fontWeight: 800,
+                  fontSize: 16,
+                  marginBottom: 2,
+                }}
+              >
+                <span role="img" aria-label="Adresse">
+                  📍
+                </span>{' '}
+                Adresse
               </label>
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                 <input
                   type="text"
                   value={country}
-                  onChange={e => setCountry(e.target.value)}
+                  onChange={(e) => setCountry(e.target.value)}
                   placeholder="Pays"
-                  style={{ padding: 8, borderRadius: 8, border: '2px solid #6366f1', fontSize: 14, width: 100 }}
+                  style={{
+                    padding: 8,
+                    borderRadius: 8,
+                    border: '2px solid #6366f1',
+                    fontSize: 14,
+                    width: 100,
+                  }}
                 />
                 <input
                   type="text"
                   value={city}
-                  onChange={e => setCity(e.target.value)}
+                  onChange={(e) => setCity(e.target.value)}
                   placeholder="Ville"
-                  style={{ padding: 8, borderRadius: 8, border: '2px solid #6366f1', fontSize: 14, width: 120 }}
+                  style={{
+                    padding: 8,
+                    borderRadius: 8,
+                    border: '2px solid #6366f1',
+                    fontSize: 14,
+                    width: 120,
+                  }}
                 />
                 <input
                   type="text"
                   value={street}
-                  onChange={e => setStreet(e.target.value)}
+                  onChange={(e) => setStreet(e.target.value)}
                   placeholder="Rue"
-                  style={{ padding: 8, borderRadius: 8, border: '2px solid #6366f1', fontSize: 14, width: 180 }}
+                  style={{
+                    padding: 8,
+                    borderRadius: 8,
+                    border: '2px solid #6366f1',
+                    fontSize: 14,
+                    width: 180,
+                  }}
                 />
                 <input
                   type="text"
                   value={streetNumber}
-                  onChange={e => setStreetNumber(e.target.value)}
+                  onChange={(e) => setStreetNumber(e.target.value)}
                   placeholder="Numéro"
-                  style={{ padding: 8, borderRadius: 8, border: '2px solid #6366f1', fontSize: 14, width: 70 }}
+                  style={{
+                    padding: 8,
+                    borderRadius: 8,
+                    border: '2px solid #6366f1',
+                    fontSize: 14,
+                    width: 70,
+                  }}
                 />
               </div>
               {adresseError && (
-                <span style={{ color: '#dc2626', marginLeft: 4, fontWeight: 700 }}>{adresseError}</span>
+                <span
+                  style={{ color: '#dc2626', marginLeft: 4, fontWeight: 700 }}
+                >
+                  {adresseError}
+                </span>
               )}
             </div>
           </div>
@@ -2884,7 +2999,14 @@ function Calculateur() {
           {/* Bloc supprimé : résultats détaillés sous la carte, on garde seulement les 4 cases infos clés */}
           {/* Tableau de rentabilité sur 20 ans */}
           <div style={{ marginTop: 24 }}>
-            <div style={{ display: 'flex', gap: 12, marginBottom: 12, alignItems: 'center' }}>
+            <div
+              style={{
+                display: 'flex',
+                gap: 12,
+                marginBottom: 12,
+                alignItems: 'center',
+              }}
+            >
               <button
                 onClick={() => setModeAugmentation(true)}
                 style={{
@@ -2918,15 +3040,29 @@ function Calculateur() {
                 Sans augmentation
               </button>
               {!paiementComptant && (
-                <div style={{ marginLeft: 18, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <label style={{ fontWeight: 700, color: '#3730a3', fontSize: 15 }}>
+                <div
+                  style={{
+                    marginLeft: 18,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                  }}
+                >
+                  <label
+                    style={{ fontWeight: 700, color: '#3730a3', fontSize: 15 }}
+                  >
                     Réinjecter la prime dans le financement
                   </label>
                   <input
                     type="checkbox"
                     checked={reinjectPrime}
-                    onChange={e => setReinjectPrime(e.target.checked)}
-                    style={{ width: 22, height: 22, accentColor: '#6366f1', cursor: 'pointer' }}
+                    onChange={(e) => setReinjectPrime(e.target.checked)}
+                    style={{
+                      width: 22,
+                      height: 22,
+                      accentColor: '#6366f1',
+                      cursor: 'pointer',
+                    }}
                   />
                 </div>
               )}
@@ -3088,11 +3224,7 @@ function Calculateur() {
                               fontWeight: 900,
                             }}
                           >
-                            {revente.toLocaleString(undefined, {
-                              minimumFractionDigits: 0,
-                              maximumFractionDigits: 0,
-                            })}{' '}
-                            €
+                            {Number(gainRevente).toFixed(2)} €
                           </td>
                           <td
                             style={{
@@ -3161,7 +3293,7 @@ function Calculateur() {
                               fontWeight: 900,
                             }}
                           >
-                            {row.reventeEstimee} €
+                            {Number(gainRevente).toFixed(2)} €
                           </td>
                           <td
                             style={{
@@ -3413,7 +3545,14 @@ function Calculateur() {
             💸 Simulation financement
           </h3>
           {/* Bouton pour choisir le mode de paiement + toggle réinjection prime */}
-          <div style={{ display: 'flex', gap: 12, marginBottom: 18, alignItems: 'center' }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: 12,
+              marginBottom: 18,
+              alignItems: 'center',
+            }}
+          >
             <button
               onClick={() => setPaiementComptant(false)}
               style={{
