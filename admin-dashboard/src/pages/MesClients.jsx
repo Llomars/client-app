@@ -30,8 +30,47 @@ const kits = [
 ];
 
 export default function MesClients() {
+  // Fetch CRM users for Acco dropdown
+  useEffect(() => {
+    const fetchCrmUsers = async () => {
+      try {
+        const q = query(collection(db, 'users'));
+        const snapshot = await getDocs(q);
+        const users = snapshot.docs.map(doc => doc.data());
+        setCrmUsers(users);
+      } catch (err) {
+        console.error('Erreur chargement CRM users:', err);
+      }
+    };
+    fetchCrmUsers();
+  }, []);
   // Ajout état pour la liste des managers/admins
   const [managers, setManagers] = useState([]);
+  // Acco feature states
+  const [accoSelectId, setAccoSelectId] = useState(null);
+  const [selectedAccoUserId, setSelectedAccoUserId] = useState(null);
+  const [crmUsers, setCrmUsers] = useState([]);
+
+  // Handler for setting Acco
+  const handleSetAcco = async (clientId, accoUserId) => {
+    if (!accoUserId) return;
+    try {
+      // Met à jour le client dans Firestore pour ajouter l'accompagnant
+      await updateDoc(doc(db, 'clients', clientId), {
+        accoUserId,
+        accoActive: true,
+      });
+      // Met à jour localement la fiche client pour affichage immédiat
+      setClients(clients.map(c => c.id === clientId ? { ...c, accoUserId, accoActive: true } : c));
+      // Affiche une confirmation
+      alert(`Accompagnant ${accoUserId} assigné au client ${clientId}`);
+    } catch (err) {
+      alert('Erreur lors de l’attribution de l’accompagnant');
+      console.error(err);
+    }
+    setAccoSelectId(null);
+    setSelectedAccoUserId(null);
+  };
   // Options pour Facture EDF et Surface Toiture
   const factureEdfOptions = [
     { value: '30-90', label: '30/90€' },
@@ -124,10 +163,47 @@ export default function MesClients() {
 
   // Ajout gestion du statut vendu local
   const handleVendu = async (id) => {
+    // Met à jour le statut du client
     await updateDoc(doc(db, 'clients', id), { statut: 'Vendu' });
     setClients(
       clients.map((c) => (c.id === id ? { ...c, statut: 'Vendu' } : c))
     );
+
+    // Récupère le client vendu
+    const client = clients.find((c) => c.id === id);
+    if (!client || !client.prixCentrale) return;
+    const caPartage = client.accoActive && client.accoUserId
+      ? Number(client.prixCentrale) / 2
+      : Number(client.prixCentrale);
+    const emails = [client.emailCommercial];
+    if (client.accoActive && client.accoUserId) emails.push(client.accoUserId);
+
+    // Met à jour les stats vendeurs pour chaque utilisateur concerné
+    const moisActuel = new Date().toISOString().slice(0, 7);
+    for (const email of emails) {
+      const statsRef = query(
+        collection(db, 'statsVendeurs'),
+        where('email', '==', email),
+        where('mois', '==', moisActuel)
+      );
+      const snap = await getDocs(statsRef);
+      if (!snap.empty) {
+        const docId = snap.docs[0].id;
+        const stats = snap.docs[0].data();
+        await updateDoc(doc(db, 'statsVendeurs', docId), {
+          totalCA: (Number(stats.totalCA) || 0) + caPartage,
+          nbVentes: (Number(stats.nbVentes) || 0) + 1,
+        });
+      } else {
+        await addDoc(collection(db, 'statsVendeurs'), {
+          email,
+          mois: moisActuel,
+          totalCA: caPartage,
+          nbVentes: 1,
+          nom: client.nom,
+        });
+      }
+    }
   };
   const handleAnnulerVente = async (id) => {
     await updateDoc(doc(db, 'clients', id), { statut: 'En cours' });
@@ -1386,15 +1462,18 @@ export default function MesClients() {
       </div>
       {/* Liste des clients filtrée */}
       <ul style={{ listStyle: 'none', padding: 0 }}>
-        {(userRole === 'commercial'
-          ? clients.filter((c) => c.emailCommercial === user.email)
-          : clients.filter((c) =>
-              activeTab
-                ? c.emailCommercial === activeTab
-                : c.emailManager === user.email &&
-                  c.emailCommercial === user.email
-            )
-        )
+        {clients
+          .filter((c) => {
+            // Commercial : accès si emailCommercial ou accoUserId
+            if (userRole === 'commercial') {
+              return c.emailCommercial === user.email || c.accoUserId === user.email;
+            }
+            // Manager : accès si emailManager ou accoUserId
+            return (activeTab
+              ? c.emailCommercial === activeTab
+              : c.emailManager === user.email && c.emailCommercial === user.email
+            ) || c.accoUserId === user.email;
+          })
           // Filtrage par état du projet
           .filter((client) => {
             if (filtreEtatProjet.length === 0) return true;
@@ -1409,20 +1488,21 @@ export default function MesClients() {
               <b>
                 {userRole === 'commercial' ? 'emailCommercial' : 'emailManager'}
               </b>{' '}
-              égal à <b>{user.email}</b>.<br />
+              égal à <b>{user.email}</b> ou que tu es bien accompagnant.<br />
               (Sinon, ajoute un client avec le formulaire ci-dessus pour tester)
             </span>
           </li>
         )}
-        {(userRole === 'commercial'
-          ? clients.filter((c) => c.emailCommercial === user.email)
-          : clients.filter((c) =>
-              activeTab
-                ? c.emailCommercial === activeTab
-                : c.emailManager === user.email &&
-                  c.emailCommercial === user.email
-            )
-        )
+        {clients
+          .filter((c) => {
+            if (userRole === 'commercial') {
+              return c.emailCommercial === user.email || c.accoUserId === user.email;
+            }
+            return (activeTab
+              ? c.emailCommercial === activeTab
+              : c.emailManager === user.email && c.emailCommercial === user.email
+            ) || c.accoUserId === user.email;
+          })
           // Filtrage par état du projet
           .filter((client) => {
             if (filtreEtatProjet.length === 0) return true;
@@ -1723,6 +1803,16 @@ export default function MesClients() {
                       Profession MR: {client.professionMR} | Profession Mme:{' '}
                       {client.professionMME}
                     </div>
+                    {client.accoActive && client.accoUserId && client.prixCentrale && (
+                      <div style={{ fontSize: 15, color: '#0ea5e9', fontWeight: 600 }}>
+                        Chiffre d'affaire partagé : {Math.round(Number(client.prixCentrale) / 2)} € chacun
+                      </div>
+                    )}
+                    {client.accoActive && client.accoUserId && (
+                      <div style={{ fontSize: 15, color: '#f472b6', fontWeight: 600 }}>
+                        Accompagnant : {crmUsers.find(u => u.email === client.accoUserId)?.nom || ''} {crmUsers.find(u => u.email === client.accoUserId)?.prenom || ''} ({client.accoUserId})
+                      </div>
+                    )}
                     {/* Affichage des études associées au client */}
                     {Array.isArray(client.Etude) && client.Etude.length > 0 && (
                       <div
@@ -1981,6 +2071,44 @@ export default function MesClients() {
                       >
                         Etat projet
                       </button>
+                        <button
+                          onClick={() => setAccoSelectId(accoSelectId === client.id ? null : client.id)}
+                          style={{
+                            padding: '6px 14px',
+                            background: '#f472b6',
+                            color: '#fff',
+                            border: 'none',
+                            borderRadius: 6,
+                            fontWeight: 600,
+                            fontSize: 15,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          Acco
+                        </button>
+                        {accoSelectId === client.id && (
+                          <div style={{ marginTop: 10 }}>
+                            <label style={{ fontWeight: 600, marginRight: 8 }}>Sélectionner un accompagnant :</label>
+                            <select
+                              value={selectedAccoUserId || ''}
+                              onChange={e => setSelectedAccoUserId(e.target.value)}
+                              style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }}
+                            >
+                              <option value=''>-- Choisir --</option>
+                              {crmUsers.filter(u => u.email !== user.email).map(u => (
+                                <option key={u.email} value={u.email}>
+                                  {(u.nom || '') + ' ' + (u.prenom || '')} ({u.email})
+                                </option>
+                              ))}
+                            </select>
+                            <button
+                              onClick={() => handleSetAcco(client.id, selectedAccoUserId)}
+                              style={{ marginLeft: 10, padding: '6px 14px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}
+                            >
+                              Valider
+                            </button>
+                          </div>
+                        )}
                     </div>
                     {/* MODAL IMPORT DOCS */}
                     {showUploadId === client.id && (

@@ -53,44 +53,13 @@ function getTagsJaugesHtml(etude, etudeData) {
     },
     {
       label: 'Rentable en ',
-      value: etudeData.anneeRentabilite,
+      value: etude.anneeRentable || etudeData.anneeRentabilite,
       color: 'linear-gradient(90deg,#FFB5DA 60%,#FF7ED4 100%)',
       icon: '⏳',
       valueColor: '#fff',
       shadow: '0 2px 12px #FFB5DA33',
     },
-    {
-      label: 'Economie et Gain total sur 20 ans',
-      value: (() => {
-        let totalGain = '-';
-        Object.entries(etude).forEach(([key, value]) => {
-          if (
-            Array.isArray(value) &&
-            value.length > 0 &&
-            typeof value[0] === 'object' &&
-            value[0] !== null &&
-            ('annee' in value[0] ||
-              'coutEdf' in value[0] ||
-              'mensualiteEdf' in value[0])
-          ) {
-            const totalDiff = value.reduce(
-              (sum, row) => sum + (Number(row.diff) || 0),
-              0
-            );
-            const totalRevente = value.reduce(
-              (sum, row) => sum + (Number(row.reventeEstimee) || 0),
-              0
-            );
-            totalGain = (totalDiff + totalRevente).toLocaleString() + ' €';
-          }
-        });
-        return totalGain;
-      })(),
-      color: 'linear-gradient(90deg,#16a34a 60%,#4ade80 100%)',
-      icon: '💰',
-      valueColor: '#fff',
-      shadow: '0 2px 12px #16a34a33',
-    },
+    // ...existing code...
   ];
   // Jauges
   const productionEstimeeNum = Number(etude.prodMoyenneKwh || 0);
@@ -172,38 +141,13 @@ function getTagsJaugesHtml(etude, etudeData) {
 function getVisualTags(etude) {
   // Calculs pour tags
   const primeValueNum = Number(etude.primeEDF || etude.prime || 0);
-  let anneeRentable = null;
-  let gainTotal20ans = null;
-  Object.entries(etude).forEach(([key, value]) => {
-    if (
-      Array.isArray(value) &&
-      value.length > 0 &&
-      typeof value[0] === 'object' &&
-      value[0] !== null &&
-      ('annee' in value[0] ||
-        'coutEdf' in value[0] ||
-        'mensualiteEdf' in value[0])
-    ) {
-      let cumul = 0;
-      for (let i = 0; i < value.length; i++) {
-        const diff = Number(value[i].diff) || 0;
-        const revente = Number(value[i].reventeEstimee) || 0;
-        const total = diff + revente;
-        if (total < 0) cumul++;
-        else break;
-      }
-      anneeRentable = cumul + 1;
-      const totalDiff = value.reduce(
-        (sum, row) => sum + (Number(row.diff) || 0),
-        0
-      );
-      const totalRevente = value.reduce(
-        (sum, row) => sum + (Number(row.reventeEstimee) || 0),
-        0
-      );
-      gainTotal20ans = (totalDiff + totalRevente).toLocaleString() + ' €';
-    }
-  });
+  let anneeRentable = etude.anneeRentable || null;
+  let gainTotal20ans =
+    etude &&
+    typeof etude.totalCumul !== 'undefined' &&
+    etude.totalCumul !== null
+      ? `${Number(etude.totalCumul).toLocaleString()} €`
+      : '-';
   return [
     {
       label: 'Production annuelle',
@@ -275,7 +219,10 @@ const FaireProposition = () => {
       Array.isArray(client.Etude) &&
       client.Etude.length > 0
     ) {
-      etude = client.Etude[0];
+      // Sélectionne l'étude selon le modePaiement si plusieurs études
+      const etudes = client.Etude;
+      // Priorité à l'étude avec modePaiement 'comptant' si existante
+      etude = etudes.find((e) => e.modePaiement === 'comptant') || etudes[0];
     } else if (client?.etudePerso) {
       etude = client.etudePerso;
     } else {
@@ -357,7 +304,7 @@ const FaireProposition = () => {
     options: '',
   });
   const [scriptMail, setScriptMail] = useState(
-    `Monsieur et Madame « [NomClient] »,\nSuite à notre échange, je vous adresse le récapitulatif de votre projet d’installation photovoltaïque.\n\n📌 Contexte\nConsommation actuelle : « [ConsoAnnuelle] », soit environ « [ConsoPrix] ».\nObjectifs : autonomie énergétique à [ObjectifAutonomie] et économies durables.\n\n⚡ Projet proposé\nCentrale photovoltaïque « [PuissanceCentrale] » avec « [Stockage] » de stockage.\nSurface de toiture à exploiter, environ « [SurfaceToiture] »\nProduction estimée : « [ProductionEstimee] ».\nPrix de base : « [PrixBase] ».\nPrime à percevoir (12–18 mois après validation) : « [Prime] ».\nCoût net après prime : [PrixBase] – [Prime] = « [PrixNet] »\n\n📊 Analyse financière\nConsommation couverte (autonomie [ObjectifAutonomie]) :\n[ObjectifAutonomie] de [ConsoAnnuelle] (conso du client) = « [ConsoCouverte] ».\nÉconomies sur facture EDF :\n« [ConsoCouverte] » × 0,25 € = « [EconomieEDF] ».\nProduction totale : « [ProductionEstimee] »\n→ Surplus = [ProductionEstimee] – [ConsoCouverte] = « [Surplus] ».\nRevente du surplus :\n[Surplus] × 0,1767 € ≈ « [ReventeSurplus] ».\nGain total annuel : [EconomieEDF] + [ReventeSurplus] ≈ « [GainAnnuel] ».\nTaux de rentabilité annuel : [GainAnnuel] ÷ [PrixNet] ≈ « [Rentabilite] ».\nDurée d’amortissement : [PrixNet] ÷ [GainAnnuel] ≈ « [Amortissement] ».\nGain mensuel équivalent : [GainAnnuel] ÷ 12 = ≈ « [GainMensuel] ».\n\n✅ Garanties\nModules photovoltaïques AE Solar : 30 ans (matériel + production).\nOnduleurs Solis : 15 ans.\nBatterie BSL : 15 ans.\n\n📑 Démarches administratives (prises en charges par Botaik)\nDéclaration préalable en mairie.\nDemande de raccordement auprès d’EDF/Enedis.\nSignature du contrat d’obligation d’achat (EDF OA).\nValidation technique (Consuel).\nVérification technique de la toiture et adaptation éventuelle de l’armature.\n\n🤝 Notre expertise et accompagnement\nPlus de 200 clients accompagnés avec succès dans leurs projets solaires.\nPartenaire Outenergie : 15 années d’expérience en pose, certifié QualiPV et RGE, permettant de garantir les normes de qualité et de vous faire bénéficier des primes EDF.\n👉 https://www.outenergiephotovoltaique.com/\nBotaik se distingue par sa transparence et son suivi, en vous accompagnant pendant toute la durée de vie de votre projet.\n\nMonsieur et Madame « [NomClient] », ce projet vous permettra de réduire vos factures EDF de manière significative, d’accéder à une autonomie énergétique de [ObjectifAutonomie] et de bénéficier d’un retour sur investissement rapide et durable.\nNous restons disponibles pour toute précision et pour avancer à vos côtés sur la mise en place du projet.\nBien cordialement,`
+  `Monsieur et Madame « [NomClient] »,\nSuite à notre échange, je vous adresse le récapitulatif de votre projet d’installation photovoltaïque.\n\n📌 Contexte\nConsommation actuelle : « [ConsoAnnuelle] », soit environ « [ConsoPrix] ».\nObjectifs : autonomie énergétique à [ObjectifAutonomie] et économies durables.\n\n⚡ Projet proposé\nCentrale photovoltaïque « [PuissanceCentrale] » avec « [Stockage] » de stockage.\nSurface de toiture à exploiter, environ « [SurfaceToiture] »\nProduction estimée : « [ProductionEstimee] ».\nPrix de base : « [PrixBase] ».\nPrime à percevoir (12–18 mois après validation) : « [Prime] ».\nCoût net après prime : [PrixBase] – [Prime] = « [PrixNet] »\n\n✅ Garanties\nModules photovoltaïques AE Solar : 30 ans (matériel + production).\nOnduleurs Solis : 15 ans.\nBatterie BSL : 15 ans.\n\n📑 Démarches administratives (prises en charges par Botaik)\nDéclaration préalable en mairie.\nDemande de raccordement auprès d’EDF/Enedis.\nSignature du contrat d’obligation d’achat (EDF OA).\nValidation technique (Consuel).\nVérification technique de la toiture et adaptation éventuelle de l’armature.\n\n🤝 Notre expertise et accompagnement\nPlus de 200 clients accompagnés avec succès dans leurs projets solaires.\nPartenaire Outenergie : 15 années d’expérience en pose, certifié QualiPV et RGE, permettant de garantir les normes de qualité et de vous faire bénéficier des primes EDF.\n👉 https://www.outenergiephotovoltaique.com/\nBotaik se distingue par sa transparence et son suivi, en vous accompagnant pendant toute la durée de vie de votre projet.\n\nMonsieur et Madame « [NomClient] », ce projet vous permettra de réduire vos factures EDF de manière significative, d’accéder à une autonomie énergétique de [ObjectifAutonomie] et de bénéficier d’un retour sur investissement rapide et durable.\nNous restons disponibles pour toute précision et pour avancer à vos côtés sur la mise en place du projet.\nBien cordialement,`
   );
   const [includeTableInMail, setIncludeTableInMail] = useState(false);
   const [showFullPreview, setShowFullPreview] = useState(false);
@@ -923,51 +870,13 @@ const FaireProposition = () => {
         gainTotal20ans = (totalDiff + totalRevente).toLocaleString() + ' €';
       }
     });
-    mail = mail.replace(
-      /(Analyse financière[\s\S]*?)(\n\n|$)/,
-      (match, p1, p2) => {
-        let extra = '';
-        if (anneeRentable) {
-          extra += `\nProjet rentable en <b style='color:#16a34a;'>${anneeRentable} ans</b>`;
-        }
-        if (gainTotal20ans) {
-          extra += `\nEconomie et gain total en 20 ans <b style='color:#16a34a;font-size:18px;'>${gainTotal20ans}</b>`;
-        }
-        return p1 + extra + '\n' + (p2 || '');
-      }
-    );
-    // Ajout du tableau de rentabilité si demandé
-    if (includeTableInMail && rentabiliteTable) {
-      mail +=
-        '\n\nTableau de rentabilité :<br />' +
-          rentabiliteTable.props.children.props.children.props
-            .dangerouslySetInnerHTML?.__html || '';
-    }
-    // Calcul des pourcentages pour jauge
-    let pourcentageUtilisation = 0;
-    let pourcentageSurplus = 0;
-    if (productionEstimeeNum > 0) {
-      pourcentageUtilisation = (
-        (consoCouverteNum / productionEstimeeNum) *
-        100
-      ).toFixed(1);
-      pourcentageSurplus = (
-        ((productionEstimeeNum - consoCouverteNum) / productionEstimeeNum) *
-        100
-      ).toFixed(1);
-    }
-    // Jauge design moderne et esthétique
-    let jaugeHtml = getTagsJaugesHtml(etude, {
-      production: productionEstimee,
-      anneeRentabilite: anneeRentable,
-    });
-    // Ajout du jauge tout en haut du mail
-    mail = mail.replace(
-      /(Monsieur et Madame [^\n]+)/,
-      (match) => match + `\n${jaugeHtml}\n`
-    );
     // Suppression des guillemets autour des données dynamiques dans le mail
     mail = mail.replace(/«\s*([^»]+)\s*»/g, '$1');
+    // Ajoute SEULEMENT le tableau HTML sauvegardé à la fin du mail (si demandé),
+    // les tags/jauges restent uniquement au début via le scriptMail
+    if (includeTableInMail && etude && etude.tableauRentabiliteHtml) {
+      mail += '<br />' + etude.tableauRentabiliteHtml;
+    }
     setMailContent(mail);
   }, [selectedClient, clients, scriptMail, includeTableInMail]);
 
@@ -1062,7 +971,7 @@ const FaireProposition = () => {
   }
 
   // Fonction utilitaire pour affichage récursif
-  function renderValue(value) {
+  function renderValue(value, etude) {
     if (value === null || value === undefined || value === '')
       return <span>-</span>;
     // Affichage spécial pour le tableau de rentabilité
@@ -1075,8 +984,8 @@ const FaireProposition = () => {
         'coutEdf' in value[0] ||
         'mensualiteEdf' in value[0])
     ) {
-      // Colonnes à afficher
-      const columns = [
+      // Colonnes à afficher : toujours identiques à celles du Calculateur, même pour paiement comptant
+      let columns = [
         { key: 'annee', label: 'Année' },
         { key: 'coutEdf', label: 'Coût EDF (€)' },
         { key: 'mensualiteEdf', label: 'Mensualité EDF (€)' },
@@ -1084,6 +993,7 @@ const FaireProposition = () => {
         { key: 'mensualiteCentrale', label: 'Mensualité centrale (€)' },
         { key: 'reventeEstimee', label: 'Revente estimée (€)' },
         { key: 'diff', label: 'Différence (€)' },
+        { key: 'cumul', label: 'Retour sur investissement' },
         { key: 'diffPlusRevente', label: 'Différence + Revente estimée (€)' },
         { key: 'prixEdfCts', label: 'Prix EDF (cts)' },
       ];
@@ -1104,6 +1014,12 @@ const FaireProposition = () => {
         (sum, row) => sum + (Number(row.diff) || 0),
         0
       );
+      // Calcul du cumul des différences (retour sur investissement)
+      let cumul = 0;
+      const rowsWithCumul = value.map((row, idx) => {
+        cumul += Number(row.diff) || 0;
+        return { ...row, cumul };
+      });
       return (
         <table
           style={{
@@ -1132,9 +1048,46 @@ const FaireProposition = () => {
             </tr>
           </thead>
           <tbody>
-            {value.map((row, idx) => (
+            {rowsWithCumul.map((row, idx) => (
               <tr key={idx}>
                 {columns.map((col) => {
+                  // Affichage spécial pour paiement comptant : coutCentrale = 0
+                  if (
+                    etude &&
+                    etude.modePaiement === 'comptant' &&
+                    col.key === 'coutCentrale'
+                  ) {
+                    return (
+                      <td
+                        key={col.key}
+                        style={{
+                          border: '1px solid #d1d5db',
+                          padding: '6px 12px',
+                          fontSize: 15,
+                        }}
+                      >
+                        0
+                      </td>
+                    );
+                  }
+                  // Colonne cumul : retour sur investissement
+                  if (col.key === 'cumul') {
+                    const isPositive = Number(row.cumul) >= 0;
+                    return (
+                      <td
+                        key={col.key}
+                        style={{
+                          border: '1px solid #d1d5db',
+                          padding: '6px 12px',
+                          fontSize: 15,
+                          color: isPositive ? '#16a34a' : '#dc2626',
+                          fontWeight: 700,
+                        }}
+                      >
+                        {row.cumul.toLocaleString()} €
+                      </td>
+                    );
+                  }
                   // Mise en vert de la différence dès qu'elle devient positive
                   if (col.key === 'diff') {
                     const isPositive = Number(row[col.key]) >= 0;
@@ -1236,16 +1189,35 @@ const FaireProposition = () => {
               </td>
             </tr>
             <tr style={{ background: '#f3f4f6', fontWeight: 700 }}>
-              <td></td>
-              <td style={{ color: '#dc2626', fontWeight: 700 }}>
-                {totalCoutEdf.toLocaleString()} €
-              </td>
-              <td></td>
-              <td>{totalCentrale.toLocaleString()} €</td>
-              <td></td>
-              <td>{totalRevente.toLocaleString()} €</td>
-              <td>{totalDiff.toLocaleString()} €</td>
-              <td></td>
+              {/* Affichage spécial pour paiement comptant : coutCentrale total = 0 */}
+              {columns.map((col, idx) => {
+                if (
+                  etude &&
+                  etude.modePaiement === 'comptant' &&
+                  col.key === 'coutCentrale'
+                ) {
+                  return <td key={col.key}>0</td>;
+                }
+                if (col.key === 'coutEdf') {
+                  return (
+                    <td
+                      key={col.key}
+                      style={{ color: '#dc2626', fontWeight: 700 }}
+                    >
+                      {totalCoutEdf.toLocaleString()} €
+                    </td>
+                  );
+                }
+                if (col.key === 'reventeEstimee') {
+                  return (
+                    <td key={col.key}>{totalRevente.toLocaleString()} €</td>
+                  );
+                }
+                if (col.key === 'diff') {
+                  return <td key={col.key}>{totalDiff.toLocaleString()} €</td>;
+                }
+                return <td key={col.key}></td>;
+              })}
             </tr>
             {/* Nouvelle case économie et gain total sur 20 ans */}
             <tr>
@@ -1345,16 +1317,24 @@ const FaireProposition = () => {
           Array.isArray(client.Etude) &&
           client.Etude.length > 0
         ) {
-          etude = client.Etude[0];
+          etude =
+            client.Etude.find((e) => e.modePaiement === 'comptant') ||
+            client.Etude[0];
         } else if (client?.etudePerso) {
           etude = client.etudePerso;
         } else {
           etude = {};
         }
-        const tableHtml = getRentabiliteTableHtml(etude);
-        if (tableHtml) {
-          htmlContent += '<br /><br />' + tableHtml;
+        // Ajoute tags/jauges une seule fois avant le tableau
+        let blocHtml = '';
+        blocHtml += getTagsJaugesHtml(etude, {
+          production: etude.prodMoyenneKwh || '-',
+          anneeRentabilite: etude.anneeRentable || '-',
+        });
+        if (etude.tableauRentabiliteHtml) {
+          blocHtml += '<br /><br />' + etude.tableauRentabiliteHtml;
         }
+        htmlContent += '<br />' + blocHtml;
       }
       await fetch('/api/send-mail', {
         method: 'POST',
@@ -1452,7 +1432,9 @@ const FaireProposition = () => {
                   Array.isArray(client.Etude) &&
                   client.Etude.length > 0
                 ) {
-                  etude = client.Etude[0];
+                  etude =
+                    client.Etude.find((e) => e.modePaiement === 'comptant') ||
+                    client.Etude[0];
                 } else if (client.etudePerso) {
                   etude = client.etudePerso;
                 } else {
@@ -1581,34 +1563,30 @@ const FaireProposition = () => {
                 Array.isArray(client.Etude) &&
                 client.Etude.length > 0
               ) {
-                etude = client.Etude[0];
+                etude =
+                  client.Etude.find((e) => e.modePaiement === 'comptant') ||
+                  client.Etude[0];
               } else if (client.etudePerso) {
                 etude = client.etudePerso;
               } else {
                 etude = {};
               }
-              let rentabiliteTable = null;
-              Object.entries(etude).forEach(([key, value]) => {
-                if (
-                  Array.isArray(value) &&
-                  value.length > 0 &&
-                  typeof value[0] === 'object' &&
-                  value[0] !== null &&
-                  ('annee' in value[0] ||
-                    'coutEdf' in value[0] ||
-                    'mensualiteEdf' in value[0])
-                ) {
-                  rentabiliteTable = renderValue(value);
-                }
-              });
-              return rentabiliteTable ? (
-                <div>
-                  <h4 style={{ color: '#2563eb', marginBottom: 8 }}>
-                    Tableau de rentabilité
-                  </h4>
-                  {rentabiliteTable}
-                </div>
-              ) : null;
+              // Affiche uniquement le tableau HTML sauvegardé, sans fallback ni recalcul
+              if (etude.tableauRentabiliteHtml) {
+                return (
+                  <div>
+                    <h4 style={{ color: '#2563eb', marginBottom: 8 }}>
+                      Tableau de rentabilité
+                    </h4>
+                    <div
+                      dangerouslySetInnerHTML={{
+                        __html: etude.tableauRentabiliteHtml,
+                      }}
+                    />
+                  </div>
+                );
+              }
+              return null;
             })()}
         </div>
       </div>
@@ -1657,7 +1635,6 @@ const FaireProposition = () => {
                         onChange={(e) =>
                           handleCellChange(rowIdx, colIdx, e.target.value)
                         }
-                        style={{ width: 100 }}
                       />
                     </td>
                   ))}
@@ -1665,24 +1642,6 @@ const FaireProposition = () => {
               ))}
             </tbody>
           </table>
-          <button
-            style={{ marginTop: 16 }}
-            onClick={handleSaveDevis}
-            disabled={!selectedClient}
-          >
-            Sauvegarder le devis
-          </button>
-        </div>
-      )}
-      {pdfPreview && (
-        <div style={{ marginTop: 32 }}>
-          <h3>Aperçu du devis PDF</h3>
-          <iframe
-            src={pdfPreview}
-            width="100%"
-            height="500px"
-            title="Aperçu PDF"
-          />
         </div>
       )}
       <div style={{ marginTop: 32 }}>
@@ -1844,53 +1803,6 @@ const FaireProposition = () => {
                   icon: '⏳',
                   valueColor: '#fff',
                   shadow: '0 2px 12px #FFB5DA33',
-                },
-                {
-                  label: 'Economie et Gain total sur 20 ans',
-                  value: (() => {
-                    // Try to get total gain from rentability table if available
-                    const client = clients.find((c) => c.id === selectedClient);
-                    let etude = null;
-                    if (
-                      client?.Etude &&
-                      Array.isArray(client.Etude) &&
-                      client.Etude.length > 0
-                    ) {
-                      etude = client.Etude[0];
-                    } else if (client?.etudePerso) {
-                      etude = client.etudePerso;
-                    } else {
-                      etude = {};
-                    }
-                    let totalGain = '-';
-                    Object.entries(etude).forEach(([key, value]) => {
-                      if (
-                        Array.isArray(value) &&
-                        value.length > 0 &&
-                        typeof value[0] === 'object' &&
-                        value[0] !== null &&
-                        ('annee' in value[0] ||
-                          'coutEdf' in value[0] ||
-                          'mensualiteEdf' in value[0])
-                      ) {
-                        const totalDiff = value.reduce(
-                          (sum, row) => sum + (Number(row.diff) || 0),
-                          0
-                        );
-                        const totalRevente = value.reduce(
-                          (sum, row) => sum + (Number(row.reventeEstimee) || 0),
-                          0
-                        );
-                        totalGain =
-                          (totalDiff + totalRevente).toLocaleString() + ' €';
-                      }
-                    });
-                    return totalGain;
-                  })(),
-                  color: 'linear-gradient(90deg,#16a34a 60%,#4ade80 100%)',
-                  icon: '💰',
-                  valueColor: '#fff',
-                  shadow: '0 2px 12px #16a34a33',
                 },
               ];
               // Jauges graphiques
@@ -2300,53 +2212,6 @@ const FaireProposition = () => {
                   valueColor: '#fff',
                   shadow: '0 2px 12px #FFB5DA33',
                 },
-                {
-                  label: 'Economie et Gain total sur 20 ans',
-                  value: (() => {
-                    // Try to get total gain from rentability table if available
-                    const client = clients.find((c) => c.id === selectedClient);
-                    let etude = null;
-                    if (
-                      client?.Etude &&
-                      Array.isArray(client.Etude) &&
-                      client.Etude.length > 0
-                    ) {
-                      etude = client.Etude[0];
-                    } else if (client?.etudePerso) {
-                      etude = client.etudePerso;
-                    } else {
-                      etude = {};
-                    }
-                    let totalGain = '-';
-                    Object.entries(etude).forEach(([key, value]) => {
-                      if (
-                        Array.isArray(value) &&
-                        value.length > 0 &&
-                        typeof value[0] === 'object' &&
-                        value[0] !== null &&
-                        ('annee' in value[0] ||
-                          'coutEdf' in value[0] ||
-                          'mensualiteEdf' in value[0])
-                      ) {
-                        const totalDiff = value.reduce(
-                          (sum, row) => sum + (Number(row.diff) || 0),
-                          0
-                        );
-                        const totalRevente = value.reduce(
-                          (sum, row) => sum + (Number(row.reventeEstimee) || 0),
-                          0
-                        );
-                        totalGain =
-                          (totalDiff + totalRevente).toLocaleString() + ' €';
-                      }
-                    });
-                    return totalGain;
-                  })(),
-                  color: 'linear-gradient(90deg,#16a34a 60%,#4ade80 100%)',
-                  icon: '💰',
-                  valueColor: '#fff',
-                  shadow: '0 2px 12px #16a34a33',
-                },
               ];
               // Jauges graphiques
               const jauges = [
@@ -2626,46 +2491,7 @@ const FaireProposition = () => {
                 __html: mailContent.replace(/\n/g, '<br />'),
               }}
             />
-            {includeTableInMail &&
-              selectedClient &&
-              (() => {
-                const client = clients.find((c) => c.id === selectedClient);
-                if (!client) return null;
-                let etude = null;
-                if (
-                  client.Etude &&
-                  Array.isArray(client.Etude) &&
-                  client.Etude.length > 0
-                ) {
-                  etude = client.Etude[0];
-                } else if (client.etudePerso) {
-                  etude = client.etudePerso;
-                } else {
-                  etude = {};
-                }
-                let rentabiliteTable = null;
-                Object.entries(etude).forEach(([key, value]) => {
-                  if (
-                    Array.isArray(value) &&
-                    value.length > 0 &&
-                    typeof value[0] === 'object' &&
-                    value[0] !== null &&
-                    ('annee' in value[0] ||
-                      'coutEdf' in value[0] ||
-                      'mensualiteEdf' in value[0])
-                  ) {
-                    rentabiliteTable = renderValue(value);
-                  }
-                });
-                return rentabiliteTable ? (
-                  <div style={{ marginTop: 24 }}>
-                    <h4 style={{ color: '#2563eb' }}>
-                      Tableau de rentabilité inclus dans le mail
-                    </h4>
-                    {rentabiliteTable}
-                  </div>
-                ) : null;
-              })()}
+            {/* Suppression de l'ancien tableau de rentabilité (renderValue) dans l'aperçu mail/preview. Seul le tableau HTML sauvegardé (tableauRentabiliteHtml) est conservé. */}
             {pdfPreview && (
               <div style={{ marginTop: 24 }}>
                 <h4 style={{ color: '#2563eb' }}>Aperçu du devis importé</h4>

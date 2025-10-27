@@ -324,10 +324,15 @@ function Calculateur() {
         );
         docPdf.setFont('helvetica', 'bold');
         docPdf.setFontSize(16);
-        // Utilise le même calcul que le bloc de vérification
-        docPdf.text(`${gainRevente} €`, col2X + blockW / 2, rowY + 16, {
-          align: 'center',
-        });
+        // Affiche la valeur saisie manuellement
+        docPdf.text(
+          gainRevente !== '' ? `${Number(gainRevente).toFixed(2)} €` : '- €',
+          col2X + blockW / 2,
+          rowY + 16,
+          {
+            align: 'center',
+          }
+        );
         // Économie totale
         rowY += rowGap;
         docPdf.setFont('helvetica', 'normal');
@@ -1164,7 +1169,7 @@ function Calculateur() {
   const [dureeMax, setDureeMax] = useState(84);
   const [mois, setMois] = useState(84);
   const [prime, setPrime] = useState(0);
-  const [gainRevente, setGainRevente] = useState(0);
+  const [gainRevente, setGainRevente] = useState(''); // valeur saisie manuellement
   const [eco, setEco] = useState(0);
   const [rentabilite, setRentabilite] = useState([]);
   const [modeAugmentation, setModeAugmentation] = useState(true); // true = avec augmentation, false = sans
@@ -1174,19 +1179,27 @@ function Calculateur() {
   // Calcul conso jour/nuit
   const consoJour = conso ? (Number(conso) * pourcentageJour) / 100 : 0;
   const consoNuit = conso ? (Number(conso) * (100 - pourcentageJour)) / 100 : 0;
+
   // Calcul par jour
   const consoNuitJour = consoNuit / 365;
   // Capacité batterie du kit (si présente)
   const kitObj = kits.find((k) => k.value === kit);
   let capaciteBatterie = 0;
-  if (kitObj && kitObj.composition) {
-    const batMatch = kitObj.composition.find((c) =>
-      c.toLowerCase().includes('batterie')
-    );
-    if (batMatch) {
-      const match = batMatch.match(/(\d+)[kK][wW][hH]/);
-      if (match) capaciteBatterie = Number(match[1]); // kWh
-      else capaciteBatterie = 5; // valeur par défaut si non précisé (kWh)
+  if (kitObj) {
+    if (kitObj.value.endsWith('KWh-2')) {
+      capaciteBatterie = 10;
+    } else if (kitObj.value.endsWith('KWh-1')) {
+      capaciteBatterie = 5;
+    } else if (kitObj.composition) {
+      // fallback extraction
+      const batMatch = kitObj.composition.find((c) =>
+        c.toLowerCase().includes('batterie')
+      );
+      if (batMatch) {
+        const match = batMatch.match(/(\d+)[kK][wW][hH]/);
+        if (match) capaciteBatterie = Number(match[1]);
+        else capaciteBatterie = 5;
+      }
     }
   }
   // Résiduel EDF la nuit
@@ -1275,21 +1288,13 @@ function Calculateur() {
       setPrixNet(kitObj.prix - remise);
       setMontantFinance(kitObj.prix - remise - apport);
       setPrime(kitObj.prime);
-      // Estimation revente annuelle sur le surplus, au bon tarif
-      let prixRevente = 0.1741;
-      if (kit && kit.startsWith('12KWh')) prixRevente = 0.0894;
-      // Calcul unique du gain revente, strictement comme le bloc de vérification
-      let surplus = prodMoyenneKwh && consoJour ? prodMoyenneKwh - consoJour : 0;
-      if (surplus < 0) surplus = 0;
-      const gainReventeCalc = (surplus * prixRevente).toFixed(2);
-      setGainRevente(gainReventeCalc);
     } else {
       setPrixCentrale(0);
       setPrixNet(0);
       setMontantFinance(0);
       setPrime(0);
-      setGainRevente(0);
     }
+    // Ne touche plus à gainRevente ici !
   }, [kit, remise, apport, prodMoyenneKwh, kits, conso, pourcentageJour]);
 
   // Calcul économies annuelles (exemple : prodMoyenneKwh * 0.18€/kWh)
@@ -1310,9 +1315,6 @@ function Calculateur() {
     const prixEdfBase = 0.25; // €/kWh (tarif Réunion 2025, MAJ)
     let prixEdf = prixEdfBase;
     const rows = [];
-    // Détermine le prix de revente selon le kit
-    let prixRevente = 0.1741; // défaut 3,6,9kW
-    if (kit.startsWith('12KWh')) prixRevente = 0.0894;
     // Nouvelle logique : remboursement anticipé de la prime à partir de la 2e année
     let montantRestant = montantFinance;
     let moisRestant = mois;
@@ -1359,21 +1361,14 @@ function Calculateur() {
           moisRestant = 0;
         }
       }
-      // Revente estimée annuelle sur le surplus (production - conso JOUR)
-      let surplus =
-        prodMoyenneKwh && consoJour ? prodMoyenneKwh - consoJour : 0;
-      if (surplus < 0) surplus = 0;
-      // Utilise le calcul direct pour toutes les années
-      const reventeEstimee =
-        prodMoyenneKwh && consoJour
-          ? ((prodMoyenneKwh - consoJour) * prixRevente).toFixed(2)
-          : '0.00';
+      // Utilise la valeur saisie manuellement pour la revente
       rows.push({
         annee,
         coutEdf: Number(coutEdf),
         coutCentrale: Number(coutCentrale),
         prixEdfCts: (prixEdf * 100).toFixed(1),
-        reventeEstimee: gainRevente, // string, affichage identique partout
+        reventeEstimee:
+          gainRevente !== '' ? Number(gainRevente).toFixed(2) : '0.00',
         diff: (Number(coutEdf) - Number(coutCentrale)).toFixed(2),
         mensualiteEdf,
         mensualiteCentrale,
@@ -1381,6 +1376,19 @@ function Calculateur() {
       prixEdf *= modeAugmentation ? 1.05 : 1.0;
     }
     setRentabilite(rows);
+    // Champ de saisie pour la revente estimée par an (à placer dans le JSX principal)
+    // <div style={{ margin: '16px 0' }}>
+    //   <label htmlFor="reventeManuelle">Revente estimée par an (€) :</label>
+    //   <input
+    //     id="reventeManuelle"
+    //     type="number"
+    //     value={gainRevente}
+    //     onChange={e => setGainRevente(e.target.value)}
+    //     min="0"
+    //     step="0.01"
+    //     style={{ marginLeft: 8, width: 120 }}
+    //   />
+    // </div>
   }, [
     prodMoyenneKwh,
     conso,
@@ -1611,19 +1619,13 @@ function Calculateur() {
       setPrixNet(kitObj.prix - remise);
       setMontantFinance(kitObj.prix - remise - apport);
       setPrime(kitObj.prime);
-      // Estimation revente annuelle sur le surplus, au bon tarif
-      let prixRevente = 0.1741;
-      if (kit && kit.startsWith('12KWh')) prixRevente = 0.0894;
-        let surplus = prodMoyenneKwh && consoJour ? prodMoyenneKwh - consoJour : 0;
-        if (surplus < 0) surplus = 0;
-        setGainRevente(surplus ? (surplus * prixRevente).toFixed(2) : '0.00');
     } else {
       setPrixCentrale(0);
       setPrixNet(0);
       setMontantFinance(0);
       setPrime(0);
-      setGainRevente(0);
     }
+    // Ne touche plus à gainRevente ici !
   }, [kit, remise, apport, prodMoyenneKwh, kits, conso]);
 
   // Calcul économies annuelles (exemple : prodMoyenneKwh * 0.18€/kWh)
@@ -1656,41 +1658,46 @@ function Calculateur() {
     for (let i = 0; i < 20; i++) {
       const annee = currentYear + i;
       const coutEdf = (conso * prixEdf).toFixed(0);
-      let coutCentrale = 0;
       // Mensualité EDF = coût EDF / 12
       const mensualiteEdf = ((conso * prixEdf) / 12).toFixed(2);
-      // Mensualité centrale = mensualitéCourante si remboursement, sinon 0
+      let coutCentrale = 0;
       let mensualiteCentrale = 0;
-      // Si encore en remboursement
-      if (moisRestant > 0) {
-        // À partir de la 2e année, on déduit la prime du solde restant (une seule fois)
-        if (i === 1 && prime && !primeUtilisee) {
-          montantRestant = Math.max(0, montantRestant - prime);
-          // Recalcule la mensualité sur le solde restant et la durée restante
-          const t = tauxRestant / 100 / 12;
-          if (t === 0) {
-            mensualiteCourante = moisRestant
-              ? (montantRestant / moisRestant).toFixed(2)
-              : '0.00';
-          } else {
-            mensualiteCourante = moisRestant
-              ? (
-                  (montantRestant * t) /
-                  (1 - Math.pow(1 + t, -moisRestant))
-                ).toFixed(2)
-              : '0.00';
+      if (paiementComptant) {
+        // Paiement comptant : tout est payé d'avance, donc 0 partout
+        coutCentrale = 0;
+        mensualiteCentrale = 0;
+      } else {
+        // Si encore en remboursement
+        if (moisRestant > 0) {
+          // À partir de la 2e année, on déduit la prime du solde restant (une seule fois)
+          if (i === 1 && prime && !primeUtilisee) {
+            montantRestant = Math.max(0, montantRestant - prime);
+            // Recalcule la mensualité sur le solde restant et la durée restante
+            const t = tauxRestant / 100 / 12;
+            if (t === 0) {
+              mensualiteCourante = moisRestant
+                ? (montantRestant / moisRestant).toFixed(2)
+                : '0.00';
+            } else {
+              mensualiteCourante = moisRestant
+                ? (
+                    (montantRestant * t) /
+                    (1 - Math.pow(1 + t, -moisRestant))
+                  ).toFixed(2)
+                : '0.00';
+            }
+            primeUtilisee = true;
           }
-          primeUtilisee = true;
-        }
-        // Coût centrale = mensualité courante * 12, mais si moins de 12 mois restants, on ajuste
-        if (moisRestant >= 12) {
-          coutCentrale = (mensualiteCourante * 12).toFixed(0);
-          mensualiteCentrale = mensualiteCourante;
-          moisRestant -= 12;
-        } else {
-          coutCentrale = (mensualiteCourante * moisRestant).toFixed(0);
-          mensualiteCentrale = moisRestant > 0 ? mensualiteCourante : 0;
-          moisRestant = 0;
+          // Coût centrale = mensualité courante * 12, mais si moins de 12 mois restants, on ajuste
+          if (moisRestant >= 12) {
+            coutCentrale = (mensualiteCourante * 12).toFixed(0);
+            mensualiteCentrale = mensualiteCourante;
+            moisRestant -= 12;
+          } else {
+            coutCentrale = (mensualiteCourante * moisRestant).toFixed(0);
+            mensualiteCentrale = moisRestant > 0 ? mensualiteCourante : 0;
+            moisRestant = 0;
+          }
         }
       }
       // Revente estimée annuelle : toujours la valeur unique de gainRevente
@@ -1853,7 +1860,28 @@ function Calculateur() {
     : [];
   const totalDiff = diffArray.reduce((acc, v) => acc + v, 0);
   // Calcul de l'année de rentabilité (première année où diff > 0)
-  const anneeRentableIndex = diffArray.findIndex((v) => v > 0);
+  let anneeRentableIndex = -1;
+  if (paiementComptant) {
+    // On cherche la première année où la colonne cumul (retour sur investissement) devient positive
+    for (let i = 0; i < rentabilite.length; i++) {
+      // La colonne cumul est calculée et affichée dans le tableau HTML, mais ici on la recalcule pour le tag
+      let cumul = -prixNet;
+      for (let j = 0; j <= i; j++) {
+        cumul +=
+          (Number(rentabilite[j].coutEdf) || 0) +
+          (Number(rentabilite[j].reventeEstimee) || 0);
+        if (j === 1 && prime) {
+          cumul += Number(prime);
+        }
+      }
+      if (cumul > 0) {
+        anneeRentableIndex = i;
+        break;
+      }
+    }
+  } else {
+    anneeRentableIndex = diffArray.findIndex((v) => v > 0);
+  }
   const anneeRentable =
     anneeRentableIndex !== -1 ? rentabilite[anneeRentableIndex] : null;
   const nbAnneesRentable = anneeRentable
@@ -2055,6 +2083,140 @@ function Calculateur() {
               onClick={async () => {
                 setAssignStatus('Enregistrement...');
                 // Prépare l'étude à sauvegarder
+                // Génère le HTML du tableau de rentabilité exactement comme affiché
+                function getTableauRentabiliteHtml(rentabilite) {
+                  let cumul = paiementComptant ? -prixNet : 0;
+                  let html = `<table style='margin:12px 0;border-collapse:collapse;background:#f3f4f6;border-radius:6;width:100%;'>`;
+                  html += `<thead><tr>`;
+                  // Colonnes à afficher selon le mode de paiement
+                  let columns = [
+                    { key: 'annee', label: 'Année' },
+                    { key: 'coutEdf', label: 'Coût EDF (€)' },
+                    { key: 'mensualiteEdf', label: 'Mensualité EDF (€)' },
+                    { key: 'coutCentrale', label: 'Coût centrale (€)' },
+                    {
+                      key: 'mensualiteCentrale',
+                      label: 'Mensualité centrale (€)',
+                    },
+                    { key: 'reventeEstimee', label: 'Revente estimée (€)' },
+                    { key: 'eco', label: 'Éco. EDF (€)' },
+                    { key: 'diffPlusRevente', label: 'Différence + Revente estimée (€)' },
+                    { key: 'prixEdfCts', label: 'Prix EDF (cts)' },
+                  ];
+                  // Si paiement comptant, on affiche la colonne 'Retour sur investissement'
+                  if (paiementComptant) {
+                    columns.splice(7, 0, { key: 'cumul', label: 'Retour sur investissement' });
+                  }
+                  // Si ce n'est pas paiement comptant, on retire la colonne 'Différence'
+                  if (!paiementComptant) {
+                    columns = columns.filter(col => col.key !== 'diff');
+                    columns = columns.filter(col => col.key !== 'cumul');
+                  }
+                  // Si paiement comptant, on masque les colonnes financement
+                  if (paiementComptant) {
+                    columns = columns.filter(
+                      (col) =>
+                        ![
+                          'coutCentrale',
+                          'mensualiteCentrale',
+                          'diff',
+                        ].includes(col.key)
+                    );
+                  }
+                  columns.forEach((col) => {
+                    html += `<th style='border:1px solid #d1d5db;padding:6px 12px;font-weight:600;background:#e0e7ff;color:#2563eb;'>${col.label}</th>`;
+                  });
+                  html += `</tr></thead><tbody>`;
+                  rentabilite.forEach((row, idx) => {
+                    if (paiementComptant) {
+                      cumul +=
+                        (Number(row.coutEdf) || 0) +
+                        (Number(row.reventeEstimee) || 0);
+                      // Ajoute la prime à la 2e année (idx === 1)
+                      if (idx === 1 && prime) {
+                        cumul += Number(prime);
+                      }
+                    } else {
+                      cumul += Number(row.diff) || 0;
+                    }
+                    html += `<tr>`;
+                    columns.forEach((col) => {
+                      let val = row[col.key];
+                      let style = `border:1px solid #d1d5db;padding:6px 12px;font-size:15px;`;
+                      if (col.key === 'diff') {
+                        if (Number(val) >= 0)
+                          style += 'color:#16a34a;font-weight:700;';
+                      }
+                      if (col.key === 'eco') {
+                        // Pour paiement comptant, économie = coût EDF annuel (car coût centrale = 0)
+                        if (paiementComptant) {
+                          val =
+                            row.coutEdf !== undefined
+                              ? `${row.coutEdf.toLocaleString()} €`
+                              : '-';
+                        } else {
+                          val = row.diff !== undefined ? `${row.diff} €` : '-';
+                        }
+                        style += 'color:#16a34a;font-weight:700;';
+                      }
+                      if (col.key === 'mensualiteCentrale') {
+                        const centrale = Number(val);
+                        const edf = Number(row['mensualiteEdf']);
+                        if (!isNaN(centrale) && !isNaN(edf) && centrale < edf)
+                          style += 'color:#16a34a;font-weight:700;';
+                      }
+                      if (col.key === 'reventeEstimee') {
+                        style += 'color:#bfa100;font-weight:700;';
+                      }
+                      if (col.key === 'diffPlusRevente') {
+                        const diff = Number(row['diff']) || 0;
+                        const revente = Number(row['reventeEstimee']) || 0;
+                        val = `${(diff + revente).toLocaleString()} €`;
+                        style += 'color:#0e7490;font-weight:700;';
+                      }
+                      if (col.key === 'cumul') {
+                        style += `font-weight:700;${
+                          cumul >= 0 ? 'color:#16a34a;' : 'color:#dc2626;'
+                        }`;
+                        val = `${cumul.toLocaleString()} €`;
+                      }
+                      html += `<td style='${style}'>${
+                        val !== undefined ? val : '-'
+                      }</td>`;
+                    });
+                    html += `</tr>`;
+                  });
+                  html += `</tbody></table>`;
+                  // Ajout du cumul coût EDF, du retour sur investissement total, et du cumul Différence+Revente estimée sur 20 ans
+                  const totalCoutEdf = rentabilite.reduce(
+                    (sum, row) => sum + (Number(row.coutEdf) || 0),
+                    0
+                  );
+                  const totalDiffPlusRevente = rentabilite.reduce(
+                    (sum, row) => sum + ((Number(row.diff) || 0) + (Number(row.reventeEstimee) || 0)),
+                    0
+                  );
+                  html += `<div style='margin-top:18px;display:flex;gap:32px;flex-wrap:wrap;'>`;
+                  html += `<div style='font-size:28px;font-weight:900;color:#dc2626;background:#fff0f0;border-radius:10px;padding:14px 32px;'>Cumul coût EDF sur 20 ans : ${totalCoutEdf.toLocaleString()} €</div>`;
+                  html += `<div style='font-size:28px;font-weight:900;color:#16a34a;background:#e0ffe0;border-radius:10px;padding:14px 32px;'>Retour sur investissement total sur 20 ans : ${totalCumul.toLocaleString()} €</div>`;
+                  html += `<div style='font-size:28px;font-weight:900;color:#0e7490;background:#e0f7ff;border-radius:10px;padding:14px 32px;'>Cumul économies + revente sur 20 ans : ${totalDiffPlusRevente.toLocaleString()} €</div>`;
+                  html += `</div>`;
+                  return html;
+                }
+                // Calcul du totalCumul (retour sur investissement total sur 20 ans)
+                let totalCumul = paiementComptant ? -prixNet : 0;
+                for (let idx = 0; idx < rentabilite.length; idx++) {
+                  if (paiementComptant) {
+                    totalCumul +=
+                      (Number(rentabilite[idx].coutEdf) || 0) +
+                      (Number(rentabilite[idx].reventeEstimee) || 0);
+                    if (idx === 1 && prime) {
+                      totalCumul += Number(prime);
+                    }
+                  } else {
+                    totalCumul += Number(rentabilite[idx].diff) || 0;
+                  }
+                }
                 const etude = {
                   date: new Date().toISOString(),
                   conso,
@@ -2080,9 +2242,15 @@ function Calculateur() {
                   gainRevente,
                   eco,
                   rentabilite,
+                  tableauRentabilite: rentabilite, // Tableau brut
+                  tableauRentabiliteHtml:
+                    getTableauRentabiliteHtml(rentabilite), // Tableau HTML complet
                   totalDiff,
                   nbAnneesRentable,
                   anneeRentable: anneeRentable?.annee || null,
+                  modePaiement: paiementComptant ? 'comptant' : 'financement',
+                  totalCumul: totalCumul,
+                  totalCumulTableau: totalCumul,
                 };
                 try {
                   const ref = doc(db, 'clients', selectedClient.id);
@@ -2130,6 +2298,39 @@ function Calculateur() {
   // --- Rendu principal ---
   return (
     <>
+      {/* Champ de saisie pour la revente estimée par an */}
+      <div
+        style={{
+          margin: '16px 0 24px 0',
+          background: '#f3f4f6',
+          padding: 16,
+          borderRadius: 8,
+          maxWidth: 340,
+        }}
+      >
+        <label
+          htmlFor="reventeManuelle"
+          style={{ fontWeight: 700, color: '#3730a3' }}
+        >
+          Revente estimée par an (€) :
+        </label>
+        <input
+          id="reventeManuelle"
+          type="number"
+          value={gainRevente}
+          onChange={(e) => setGainRevente(e.target.value)}
+          min="0"
+          step="0.01"
+          style={{
+            marginLeft: 12,
+            width: 120,
+            fontSize: 16,
+            padding: 4,
+            borderRadius: 4,
+            border: '1px solid #c7d2fe',
+          }}
+        />
+      </div>
       {/* Aperçu PDF modal */}
       {showPdfPreview && (
         <div
@@ -2304,7 +2505,7 @@ function Calculateur() {
         }}
       >
         {/* Colonne principale infos centrale/client */}
-        {/* DEBUG CALCUL REVENTE */}
+        {/* Champ de saisie pour la revente estimée par an (juste au-dessus du tableau de rentabilité) */}
         <div
           style={{
             background: '#fffbe6',
@@ -2312,32 +2513,31 @@ function Calculateur() {
             borderRadius: 8,
             padding: 12,
             marginBottom: 18,
+            maxWidth: 340,
           }}
         >
-          <strong>Vérification calcul revente :</strong>
-          <br />
-          Production annuelle estimée : <b>{prodMoyenneKwh} kWh</b>
-          <br />
-          Consommation jour annuelle : <b>{consoJour} kWh</b>
-          <br />
-          Surplus (prod - conso jour) :{' '}
-          <b>
-            {prodMoyenneKwh && consoJour ? prodMoyenneKwh - consoJour : 0} kWh
-          </b>
-          <br />
-          Tarif revente :{' '}
-          <b>{kit && kit.startsWith('12KWh') ? '0,0894' : '0,1741'} €/kWh</b>
-          <br />
-          Gain revente estimé :{' '}
-          <b>
-            {prodMoyenneKwh && consoJour
-              ? (
-                  (prodMoyenneKwh - consoJour) *
-                  (kit && kit.startsWith('12KWh') ? 0.0894 : 0.1741)
-                ).toFixed(2)
-              : '0.00'}{' '}
-            €
-          </b>
+          <label
+            htmlFor="reventeManuelle2"
+            style={{ fontWeight: 700, color: '#b45309' }}
+          >
+            Revente estimée par an (€) :
+          </label>
+          <input
+            id="reventeManuelle2"
+            type="number"
+            value={gainRevente}
+            onChange={(e) => setGainRevente(e.target.value)}
+            min="0"
+            step="0.01"
+            style={{
+              marginLeft: 12,
+              width: 120,
+              fontSize: 16,
+              padding: 4,
+              borderRadius: 4,
+              border: '1px solid #ffe58f',
+            }}
+          />
         </div>
         <div
           style={{
@@ -2878,7 +3078,9 @@ function Calculateur() {
               Revente estimée par an
               <br />
               <span style={{ fontWeight: 900, fontSize: 20, color: '#0e7490' }}>
-                {gainRevente ? gainRevente + ' €' : '-'}
+                {rentabilite && rentabilite.length > 0
+                  ? rentabilite[0].reventeEstimee + ' €'
+                  : '-'}
               </span>
             </div>
             <div
