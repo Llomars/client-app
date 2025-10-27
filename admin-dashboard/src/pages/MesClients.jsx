@@ -1,3 +1,4 @@
+
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   addDoc,
@@ -30,13 +31,15 @@ const kits = [
 ];
 
 export default function MesClients() {
+  // État pour le filtre par nom de client (doit être dans le composant)
+  const [filtreNomClient, setFiltreNomClient] = useState('');
   // Fetch CRM users for Acco dropdown
   useEffect(() => {
     const fetchCrmUsers = async () => {
       try {
         const q = query(collection(db, 'users'));
         const snapshot = await getDocs(q);
-        const users = snapshot.docs.map(doc => doc.data());
+        const users = snapshot.docs.map((doc) => doc.data());
         setCrmUsers(users);
       } catch (err) {
         console.error('Erreur chargement CRM users:', err);
@@ -61,7 +64,11 @@ export default function MesClients() {
         accoActive: true,
       });
       // Met à jour localement la fiche client pour affichage immédiat
-      setClients(clients.map(c => c.id === clientId ? { ...c, accoUserId, accoActive: true } : c));
+      setClients(
+        clients.map((c) =>
+          c.id === clientId ? { ...c, accoUserId, accoActive: true } : c
+        )
+      );
       // Affiche une confirmation
       alert(`Accompagnant ${accoUserId} assigné au client ${clientId}`);
     } catch (err) {
@@ -172,9 +179,10 @@ export default function MesClients() {
     // Récupère le client vendu
     const client = clients.find((c) => c.id === id);
     if (!client || !client.prixCentrale) return;
-    const caPartage = client.accoActive && client.accoUserId
-      ? Number(client.prixCentrale) / 2
-      : Number(client.prixCentrale);
+    const caPartage =
+      client.accoActive && client.accoUserId
+        ? Number(client.prixCentrale) / 2
+        : Number(client.prixCentrale);
     const emails = [client.emailCommercial];
     if (client.accoActive && client.accoUserId) emails.push(client.accoUserId);
 
@@ -1443,6 +1451,21 @@ export default function MesClients() {
             {opt.label}
           </button>
         ))}
+        {/* Champ de filtre par nom de client */}
+        <input
+          type="text"
+          placeholder="Filtrer par nom..."
+          value={filtreNomClient}
+          onChange={e => setFiltreNomClient(e.target.value)}
+          style={{
+            marginLeft: 16,
+            padding: '6px 12px',
+            borderRadius: 6,
+            border: '1px solid #d1d5db',
+            fontSize: 15,
+            minWidth: 180,
+          }}
+        />
         {filtreEtatProjet.length > 0 && (
           <button
             type="button"
@@ -1466,20 +1489,34 @@ export default function MesClients() {
           .filter((c) => {
             // Commercial : accès si emailCommercial ou accoUserId
             if (userRole === 'commercial') {
-              return c.emailCommercial === user.email || c.accoUserId === user.email;
+              return (
+                c.emailCommercial === user.email || c.accoUserId === user.email
+              );
             }
             // Manager : accès si emailManager ou accoUserId
-            return (activeTab
-              ? c.emailCommercial === activeTab
-              : c.emailManager === user.email && c.emailCommercial === user.email
-            ) || c.accoUserId === user.email;
+            return (
+              (activeTab
+                ? c.emailCommercial === activeTab
+                : c.emailManager === user.email &&
+                  c.emailCommercial === user.email) ||
+              c.accoUserId === user.email
+            );
           })
           // Filtrage par état du projet
           .filter((client) => {
             if (filtreEtatProjet.length === 0) return true;
             const etat = etatProjet[client.id] || {};
             return filtreEtatProjet.some((key) => etat[key]);
-          }).length === 0 && (
+          })
+          // Filtrage par nom de client
+          .filter((client) => {
+            if (!filtreNomClient.trim()) return true;
+            const nom = (client.nom || '').toLowerCase();
+            const prenom = (client.prenom || '').toLowerCase();
+            const search = filtreNomClient.trim().toLowerCase();
+            return nom.includes(search) || prenom.includes(search);
+          })
+          .length === 0 && (
           <li style={{ color: '#ef4444', fontWeight: 600 }}>
             Aucun client attribué.
             <br />
@@ -1488,7 +1525,8 @@ export default function MesClients() {
               <b>
                 {userRole === 'commercial' ? 'emailCommercial' : 'emailManager'}
               </b>{' '}
-              égal à <b>{user.email}</b> ou que tu es bien accompagnant.<br />
+              égal à <b>{user.email}</b> ou que tu es bien accompagnant.
+              <br />
               (Sinon, ajoute un client avec le formulaire ci-dessus pour tester)
             </span>
           </li>
@@ -1496,18 +1534,31 @@ export default function MesClients() {
         {clients
           .filter((c) => {
             if (userRole === 'commercial') {
-              return c.emailCommercial === user.email || c.accoUserId === user.email;
+              return (
+                c.emailCommercial === user.email || c.accoUserId === user.email
+              );
             }
-            return (activeTab
-              ? c.emailCommercial === activeTab
-              : c.emailManager === user.email && c.emailCommercial === user.email
-            ) || c.accoUserId === user.email;
+            return (
+              (activeTab
+                ? c.emailCommercial === activeTab
+                : c.emailManager === user.email &&
+                  c.emailCommercial === user.email) ||
+              c.accoUserId === user.email
+            );
           })
           // Filtrage par état du projet
           .filter((client) => {
             if (filtreEtatProjet.length === 0) return true;
             const etat = etatProjet[client.id] || {};
             return filtreEtatProjet.some((key) => etat[key]);
+          })
+          // Filtrage par nom de client
+          .filter((client) => {
+            if (!filtreNomClient.trim()) return true;
+            const nom = (client.nom || '').toLowerCase();
+            const prenom = (client.prenom || '').toLowerCase();
+            const search = filtreNomClient.trim().toLowerCase();
+            return nom.includes(search) || prenom.includes(search);
           })
           .map((client) => {
             // Récupération de l'état projet pour ce client
@@ -1803,14 +1854,34 @@ export default function MesClients() {
                       Profession MR: {client.professionMR} | Profession Mme:{' '}
                       {client.professionMME}
                     </div>
-                    {client.accoActive && client.accoUserId && client.prixCentrale && (
-                      <div style={{ fontSize: 15, color: '#0ea5e9', fontWeight: 600 }}>
-                        Chiffre d'affaire partagé : {Math.round(Number(client.prixCentrale) / 2)} € chacun
-                      </div>
-                    )}
+                    {client.accoActive &&
+                      client.accoUserId &&
+                      client.prixCentrale && (
+                        <div
+                          style={{
+                            fontSize: 15,
+                            color: '#0ea5e9',
+                            fontWeight: 600,
+                          }}
+                        >
+                          Chiffre d'affaire partagé :{' '}
+                          {Math.round(Number(client.prixCentrale) / 2)} € chacun
+                        </div>
+                      )}
                     {client.accoActive && client.accoUserId && (
-                      <div style={{ fontSize: 15, color: '#f472b6', fontWeight: 600 }}>
-                        Accompagnant : {crmUsers.find(u => u.email === client.accoUserId)?.nom || ''} {crmUsers.find(u => u.email === client.accoUserId)?.prenom || ''} ({client.accoUserId})
+                      <div
+                        style={{
+                          fontSize: 15,
+                          color: '#f472b6',
+                          fontWeight: 600,
+                        }}
+                      >
+                        Accompagnant :{' '}
+                        {crmUsers.find((u) => u.email === client.accoUserId)
+                          ?.nom || ''}{' '}
+                        {crmUsers.find((u) => u.email === client.accoUserId)
+                          ?.prenom || ''}{' '}
+                        ({client.accoUserId})
                       </div>
                     )}
                     {/* Affichage des études associées au client */}
@@ -2071,44 +2142,72 @@ export default function MesClients() {
                       >
                         Etat projet
                       </button>
-                        <button
-                          onClick={() => setAccoSelectId(accoSelectId === client.id ? null : client.id)}
-                          style={{
-                            padding: '6px 14px',
-                            background: '#f472b6',
-                            color: '#fff',
-                            border: 'none',
-                            borderRadius: 6,
-                            fontWeight: 600,
-                            fontSize: 15,
-                            cursor: 'pointer',
-                          }}
-                        >
-                          Acco
-                        </button>
-                        {accoSelectId === client.id && (
-                          <div style={{ marginTop: 10 }}>
-                            <label style={{ fontWeight: 600, marginRight: 8 }}>Sélectionner un accompagnant :</label>
-                            <select
-                              value={selectedAccoUserId || ''}
-                              onChange={e => setSelectedAccoUserId(e.target.value)}
-                              style={{ padding: 6, borderRadius: 6, border: '1px solid #d1d5db', fontSize: 15 }}
-                            >
-                              <option value=''>-- Choisir --</option>
-                              {crmUsers.filter(u => u.email !== user.email).map(u => (
+                      <button
+                        onClick={() =>
+                          setAccoSelectId(
+                            accoSelectId === client.id ? null : client.id
+                          )
+                        }
+                        style={{
+                          padding: '6px 14px',
+                          background: '#f472b6',
+                          color: '#fff',
+                          border: 'none',
+                          borderRadius: 6,
+                          fontWeight: 600,
+                          fontSize: 15,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        Acco
+                      </button>
+                      {accoSelectId === client.id && (
+                        <div style={{ marginTop: 10 }}>
+                          <label style={{ fontWeight: 600, marginRight: 8 }}>
+                            Sélectionner un accompagnant :
+                          </label>
+                          <select
+                            value={selectedAccoUserId || ''}
+                            onChange={(e) =>
+                              setSelectedAccoUserId(e.target.value)
+                            }
+                            style={{
+                              padding: 6,
+                              borderRadius: 6,
+                              border: '1px solid #d1d5db',
+                              fontSize: 15,
+                            }}
+                          >
+                            <option value="">-- Choisir --</option>
+                            {crmUsers
+                              .filter((u) => u.email !== user.email)
+                              .map((u) => (
                                 <option key={u.email} value={u.email}>
-                                  {(u.nom || '') + ' ' + (u.prenom || '')} ({u.email})
+                                  {(u.nom || '') + ' ' + (u.prenom || '')} (
+                                  {u.email})
                                 </option>
                               ))}
-                            </select>
-                            <button
-                              onClick={() => handleSetAcco(client.id, selectedAccoUserId)}
-                              style={{ marginLeft: 10, padding: '6px 14px', background: '#10b981', color: '#fff', border: 'none', borderRadius: 6, fontWeight: 600, fontSize: 15, cursor: 'pointer' }}
-                            >
-                              Valider
-                            </button>
-                          </div>
-                        )}
+                          </select>
+                          <button
+                            onClick={() =>
+                              handleSetAcco(client.id, selectedAccoUserId)
+                            }
+                            style={{
+                              marginLeft: 10,
+                              padding: '6px 14px',
+                              background: '#10b981',
+                              color: '#fff',
+                              border: 'none',
+                              borderRadius: 6,
+                              fontWeight: 600,
+                              fontSize: 15,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            Valider
+                          </button>
+                        </div>
+                      )}
                     </div>
                     {/* MODAL IMPORT DOCS */}
                     {showUploadId === client.id && (
@@ -3498,9 +3597,7 @@ export default function MesClients() {
               'installe',
             ].map((key) => (
               <div key={key} style={{ marginBottom: 10 }}>
-                <label
-                  style={{ fontWeight: 600, marginRight: 12 }}
-                >
+                <label style={{ fontWeight: 600, marginRight: 12 }}>
                   <input
                     type="checkbox"
                     checked={!!etatProjet[showEtatProjetId]?.[key]}
@@ -3550,9 +3647,7 @@ export default function MesClients() {
                 )}
               </div>
             ))}
-            <div
-              style={{ display: 'flex', gap: 16, marginTop: 24 }}
-            >
+            <div style={{ display: 'flex', gap: 16, marginTop: 24 }}>
               <button
                 onClick={() => handleSaveEtatProjet(showEtatProjetId)}
                 style={{
