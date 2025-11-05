@@ -20,6 +20,52 @@ import { db } from '../firebaseConfig';
 // db est importé depuis firebaseConfig.js (déjà initialisé)
 
 function Calculateur() {
+  // --- Firestore config primes/rachat ---
+  const PARAMS_DOC_ID = 'calculateur_params';
+  const [loadingParams, setLoadingParams] = useState(true);
+  // ...existing code...
+  // Champs admin pour prime et tarif de rachat
+  // Champs admin pour prime par puissance
+  const [prime3Admin, setPrime3Admin] = useState(null);
+  const [prime6Admin, setPrime6Admin] = useState(null);
+  const [prime9Admin, setPrime9Admin] = useState(null);
+  const [tarifRachatAdmin, setTarifRachatAdmin] = useState(null);
+
+  // Charge les paramètres Firestore au démarrage
+  useEffect(() => {
+    async function fetchParams() {
+      setLoadingParams(true);
+      try {
+        const ref = doc(db, 'config', PARAMS_DOC_ID);
+        const snap = await import('firebase/firestore').then(({ getDoc }) => getDoc(ref));
+        if (snap.exists()) {
+          const data = snap.data();
+          setPrime3Admin(data.prime3 ?? null);
+          setPrime6Admin(data.prime6 ?? null);
+          setPrime9Admin(data.prime9 ?? null);
+          setTarifRachatAdmin(data.tarifRachat ?? null);
+        }
+      } catch (e) {}
+      setLoadingParams(false);
+    }
+    fetchParams();
+  }, []);
+
+  // Sauvegarde les paramètres Firestore (admin)
+  const saveParams = async () => {
+    try {
+      const ref = doc(db, 'config', PARAMS_DOC_ID);
+      await import('firebase/firestore').then(({ setDoc }) => setDoc(ref, {
+        prime3: prime3Admin,
+        prime6: prime6Admin,
+        prime9: prime9Admin,
+        tarifRachat: tarifRachatAdmin,
+      }));
+      alert('Paramètres enregistrés !');
+    } catch (e) {
+      alert('Erreur enregistrement Firestore');
+    }
+  };
   // Permet de forcer le refresh de la simulation
   const [refreshKey, setRefreshKey] = useState(0);
   // ...existing hooks...
@@ -925,12 +971,13 @@ function Calculateur() {
     { nom: 'Bred', taux: 2.7, dureeMax: 160 },
     { nom: 'La banque postale', taux: 2.3, dureeMax: 140 },
   ];
+  // Utilise la prime admin selon le kit
   const kits = [
     {
       label: '3 KWh 0',
       value: '3KWh-0',
       prix: 7500,
-      prime: 4830,
+  prime: prime3Admin !== null ? prime3Admin : 4830,
       composition: [
         'Panneaux de 500W x 6',
         'Onduleur de 3Kwh',
@@ -948,7 +995,7 @@ function Calculateur() {
       label: '3 KWh 1',
       value: '3KWh-1',
       prix: 9500,
-      prime: 4830,
+  prime: prime3Admin !== null ? prime3Admin : 4830,
       composition: [
         'Panneaux de 500W x 6',
         'Batterie de 5Kwh',
@@ -967,7 +1014,7 @@ function Calculateur() {
       label: '6 KWh 0',
       value: '6KWh-0',
       prix: 12000,
-      prime: 5760,
+  prime: prime6Admin !== null ? prime6Admin : 5760,
       composition: [
         'Panneaux de 500W x 12',
         'Onduleur de 6Kwh',
@@ -985,7 +1032,7 @@ function Calculateur() {
       label: '6 KWh 1',
       value: '6KWh-1',
       prix: 15000,
-      prime: 5760,
+  prime: prime6Admin !== null ? prime6Admin : 5760,
       composition: [
         'Panneaux de 500W x 12',
         'Batterie de 5Kwh',
@@ -1004,7 +1051,7 @@ function Calculateur() {
       label: '6 KWh 2',
       value: '6KWh-2',
       prix: 16000,
-      prime: 5760,
+  prime: prime6Admin !== null ? prime6Admin : 5760,
       composition: [
         'Panneaux de 500W x 12',
         'Batterie de 10Kwh',
@@ -1023,7 +1070,7 @@ function Calculateur() {
       label: '9 KWh 0',
       value: '9KWh-0',
       prix: 16500,
-      prime: 8640,
+  prime: prime9Admin !== null ? prime9Admin : 8640,
       composition: [
         'Panneaux de 500W x 18',
         'Onduleur de 6Kwh',
@@ -1042,7 +1089,7 @@ function Calculateur() {
       label: '9 KWh 1',
       value: '9KWh-1',
       prix: 22000,
-      prime: 8640,
+  prime: prime9Admin !== null ? prime9Admin : 8640,
       composition: [
         'Panneaux de 500W x 18',
         'Batterie de 5Kwh',
@@ -1062,7 +1109,7 @@ function Calculateur() {
       label: '9 KWh 2',
       value: '9KWh-2',
       prix: 24000,
-      prime: 8640,
+  prime: prime9Admin !== null ? prime9Admin : 8640,
       composition: [
         'Panneaux de 500W x 18',
         'Batterie de 10Kwh',
@@ -1082,7 +1129,7 @@ function Calculateur() {
       label: '12 KWh 0',
       value: '12KWh-0',
       prix: 22000,
-      prime: 6840,
+  prime: prime9Admin !== null ? prime9Admin : 6840,
       composition: [
         'Panneaux de 500W x 24',
         'Onduleur de 6Kwh x 2',
@@ -1100,7 +1147,7 @@ function Calculateur() {
       label: '12 KWh 2',
       value: '12KWh-2',
       prix: 30000,
-      prime: 6840,
+  prime: prime9Admin !== null ? prime9Admin : 6840,
       composition: [
         'Panneaux de 500W x 24',
         'Batterie de 10KWh',
@@ -1647,8 +1694,8 @@ function Calculateur() {
     let prixEdf = prixEdfBase;
     const rows = [];
     // Détermine le prix de revente selon le kit
-    let prixRevente = 0.1741; // défaut 3,6,9kW
-    if (kit.startsWith('12KWh')) prixRevente = 0.0894;
+    let prixRevente = tarifRachatAdmin !== null ? tarifRachatAdmin : 0.1741; // défaut 3,6,9kW
+    if (kit.startsWith('12KWh')) prixRevente = tarifRachatAdmin !== null ? tarifRachatAdmin : 0.0894;
     // Nouvelle logique : remboursement anticipé de la prime à partir de la 2e année
     let montantRestant = montantFinance;
     let moisRestant = mois;
@@ -2100,17 +2147,23 @@ function Calculateur() {
                     },
                     { key: 'reventeEstimee', label: 'Revente estimée (€)' },
                     { key: 'eco', label: 'Éco. EDF (€)' },
-                    { key: 'diffPlusRevente', label: 'Différence + Revente estimée (€)' },
+                    {
+                      key: 'diffPlusRevente',
+                      label: 'Différence + Revente estimée (€)',
+                    },
                     { key: 'prixEdfCts', label: 'Prix EDF (cts)' },
                   ];
                   // Si paiement comptant, on affiche la colonne 'Retour sur investissement'
                   if (paiementComptant) {
-                    columns.splice(7, 0, { key: 'cumul', label: 'Retour sur investissement' });
+                    columns.splice(7, 0, {
+                      key: 'cumul',
+                      label: 'Retour sur investissement',
+                    });
                   }
                   // Si ce n'est pas paiement comptant, on retire la colonne 'Différence'
                   if (!paiementComptant) {
-                    columns = columns.filter(col => col.key !== 'diff');
-                    columns = columns.filter(col => col.key !== 'cumul');
+                    columns = columns.filter((col) => col.key !== 'diff');
+                    columns = columns.filter((col) => col.key !== 'cumul');
                   }
                   // Si paiement comptant, on masque les colonnes financement
                   if (paiementComptant) {
@@ -2193,7 +2246,10 @@ function Calculateur() {
                     0
                   );
                   const totalDiffPlusRevente = rentabilite.reduce(
-                    (sum, row) => sum + ((Number(row.diff) || 0) + (Number(row.reventeEstimee) || 0)),
+                    (sum, row) =>
+                      sum +
+                      ((Number(row.diff) || 0) +
+                        (Number(row.reventeEstimee) || 0)),
                     0
                   );
                   html += `<div style='margin-top:18px;display:flex;gap:32px;flex-wrap:wrap;'>`;
@@ -2504,6 +2560,23 @@ function Calculateur() {
           background: 'linear-gradient(120deg,#f3f4f6 60%,#c7d2fe 100%)',
         }}
       >
+        {/* Champs admin pour prime et tarif de rachat */}
+        {role === 'admin' && (
+          <div style={{ background: '#f1f5f9', borderRadius: 12, padding: 18, marginBottom: 24, maxWidth: 340 }}>
+            <h4 style={{ color: '#3730a3', fontWeight: 700, fontSize: 18, marginBottom: 12 }}>Paramètres administrateur</h4>
+            <label style={{ fontWeight: 600, color: '#0e7490', fontSize: 15 }}>Prime 3 kWc (€)</label>
+            <input type="number" value={prime3Admin ?? ''} onChange={e => setPrime3Admin(e.target.value ? Number(e.target.value) : null)} min={0} step={1} style={{ marginBottom: 12, width: 120, fontSize: 16, padding: 4, borderRadius: 4, border: '1px solid #c7d2fe' }} />
+            <label style={{ fontWeight: 600, color: '#0e7490', fontSize: 15 }}>Prime 6 kWc (€)</label>
+            <input type="number" value={prime6Admin ?? ''} onChange={e => setPrime6Admin(e.target.value ? Number(e.target.value) : null)} min={0} step={1} style={{ marginBottom: 12, width: 120, fontSize: 16, padding: 4, borderRadius: 4, border: '1px solid #c7d2fe' }} />
+            <label style={{ fontWeight: 600, color: '#0e7490', fontSize: 15 }}>Prime 9 kWc (€)</label>
+            <input type="number" value={prime9Admin ?? ''} onChange={e => setPrime9Admin(e.target.value ? Number(e.target.value) : null)} min={0} step={1} style={{ marginBottom: 12, width: 120, fontSize: 16, padding: 4, borderRadius: 4, border: '1px solid #c7d2fe' }} />
+            <label style={{ fontWeight: 600, color: '#0e7490', fontSize: 15 }}>Tarif de rachat (€ / kWh)</label>
+            <input type="number" value={tarifRachatAdmin ?? ''} onChange={e => setTarifRachatAdmin(e.target.value ? Number(e.target.value) : null)} min={0} step={0.0001} style={{ width: 120, fontSize: 16, padding: 4, borderRadius: 4, border: '1px solid #c7d2fe' }} />
+            <button onClick={saveParams} style={{ marginTop: 16, background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 800, fontSize: 16, cursor: 'pointer' }}>Enregistrer</button>
+            <div style={{ fontSize: 13, color: '#64748b', marginTop: 8 }}>Ces valeurs sont appliquées à tous les calculs et utilisateurs.</div>
+            {loadingParams && <div style={{ color: '#6366f1', marginTop: 8 }}>Chargement paramètres...</div>}
+          </div>
+        )}
         {/* Colonne principale infos centrale/client */}
         {/* Champ de saisie pour la revente estimée par an (juste au-dessus du tableau de rentabilité) */}
         <div
