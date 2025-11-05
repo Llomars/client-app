@@ -1210,6 +1210,25 @@ function Calculateur() {
   const [streetNumber, setStreetNumber] = useState('');
   const [loadingAdresse, setLoadingAdresse] = useState(false);
   const [coords, setCoords] = useState({ lat: -21.1151, lng: 55.5364 }); // Centre Réunion
+  // Géolocalisation navigateur
+  const handleUseCurrentLocation = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setCoords({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          });
+          setAdresseError('');
+        },
+        (error) => {
+          setAdresseError("Impossible d'obtenir la localisation actuelle");
+        }
+      );
+    } else {
+      setAdresseError("La géolocalisation n'est pas supportée par ce navigateur");
+    }
+  };
   const [adresseError, setAdresseError] = useState('');
   const [banque, setBanque] = useState('BFC');
   const [taux, setTaux] = useState(6.99);
@@ -2994,7 +3013,7 @@ function Calculateur() {
                 ))}
               </select>
             </div>
-            {/* Adresse */}
+            {/* Adresse + bouton géolocalisation */}
             <div
               style={{
                 gridColumn: '1 / span 2',
@@ -3069,6 +3088,24 @@ function Calculateur() {
                     width: 70,
                   }}
                 />
+                <button
+                  type="button"
+                  onClick={handleUseCurrentLocation}
+                  style={{
+                    padding: '8px 16px',
+                    borderRadius: 8,
+                    border: 'none',
+                    background: '#10b981',
+                    color: '#fff',
+                    fontWeight: 700,
+                    fontSize: 15,
+                    marginLeft: 8,
+                    cursor: 'pointer',
+                  }}
+                  title="Utiliser ma localisation actuelle"
+                >
+                  Utiliser ma localisation
+                </button>
               </div>
               {adresseError && (
                 <span
