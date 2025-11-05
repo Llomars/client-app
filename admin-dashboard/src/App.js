@@ -15,9 +15,11 @@ import Plannings from './pages/plannings.jsx';
 import SAV from './pages/SAV.jsx';
 import Logistique from './pages/Logistique.jsx';
 import Calculateur from './pages/Calculateur.jsx';
+import CalculateurPlugAndPlay from './pages/CalculateurPlugAndPlay.jsx';
 import Relances from './pages/Relances.jsx';
 import FaireProposition from './pages/FaireProposition.jsx';
 import ClientsChauds from './pages/ClientsChauds.jsx';
+import RecapProjetClient from './pages/RecapProjetClient.jsx';
 
 console.log('🔍 Performance.jsx chargé');
 
@@ -39,10 +41,12 @@ export default function App() {
         <Route path="/plannings" element={<Plannings />} />
         <Route path="/sav" element={<SAV />} />
         <Route path="/logistique" element={<Logistique />} />
-        <Route path="/calculateur" element={<Calculateur />} />
+  <Route path="/calculateur" element={<Calculateur />} />
+  <Route path="/calculateur-plug-and-play" element={<CalculateurPlugAndPlay />} />
         <Route path="/relances" element={<Relances />} />
         <Route path="/faire-proposition" element={<FaireProposition />} />
         <Route path="/clients-chauds" element={<ClientsChauds />} />
+        <Route path="/recap-projet-client" element={<RecapProjetClient />} />
       </Routes>
     </Router>
   );

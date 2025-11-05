@@ -1,5 +1,5 @@
-// components/Header.jsx
 
+// components/Header.jsx
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -160,6 +160,21 @@ export default function Header() {
                 📊 Calculateur
               </Link>
               <Link
+                to="/calculateur-plug-and-play"
+                style={{
+                  background: '#818cf8',
+                  padding: '8px 16px',
+                  borderRadius: '8px',
+                  color: '#fff',
+                  fontWeight: '500',
+                  textDecoration: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                }}
+              >
+                🔌 Plug & Play
+              </Link>
+              <Link
                 to="/clients-chauds"
                 style={{
                   background: '#f59e42',
@@ -217,6 +232,7 @@ export default function Header() {
               }}>{relancesJourCount}</span>
             )}
           </Link>
+
           <Link
             to="/faire-proposition"
             style={{
@@ -233,6 +249,24 @@ export default function Header() {
           >
             <span role="img" aria-label="proposition" style={{ fontSize: 20 }}>💼</span>
             Faire une proposition
+          </Link>
+
+          <Link
+            to="/recap-projet-client"
+            style={{
+              background: '#6366f1',
+              padding: '8px 16px',
+              borderRadius: '8px',
+              textDecoration: 'none',
+              color: '#fff',
+              fontWeight: '500',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+          >
+            <span role="img" aria-label="recap" style={{ fontSize: 20 }}>📁</span>
+            Récap projet client
           </Link>
 
           <button
