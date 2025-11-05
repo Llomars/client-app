@@ -19,7 +19,7 @@ import CalculateurPlugAndPlay from './pages/CalculateurPlugAndPlay.jsx';
 import Relances from './pages/Relances.jsx';
 import FaireProposition from './pages/FaireProposition.jsx';
 import ClientsChauds from './pages/ClientsChauds.jsx';
-import RecapProjetClient from './pages/RecapProjetClient.jsx';
+// import RecapProjetClient from './pages/RecapProjetClient.jsx';
 
 console.log('🔍 Performance.jsx chargé');
 
@@ -46,7 +46,7 @@ export default function App() {
         <Route path="/relances" element={<Relances />} />
         <Route path="/faire-proposition" element={<FaireProposition />} />
         <Route path="/clients-chauds" element={<ClientsChauds />} />
-        <Route path="/recap-projet-client" element={<RecapProjetClient />} />
+  {/* <Route path="/recap-projet-client" element={<RecapProjetClient />} /> */}
       </Routes>
     </Router>
   );
