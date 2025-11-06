@@ -1307,35 +1307,8 @@ const FaireProposition = () => {
           reader.readAsDataURL(blob);
         });
       }
-      // Ajout du tableau de rentabilité dans le mail si demandé
+      // Correction : n'ajoute pas le tableau de rentabilité une deuxième fois si déjà présent dans mailContent
       let htmlContent = mailContent.replace(/\n/g, '<br />');
-      if (includeTableInMail && selectedClient) {
-        const client = clients.find((c) => c.id === selectedClient);
-        let etude = null;
-        if (
-          client?.Etude &&
-          Array.isArray(client.Etude) &&
-          client.Etude.length > 0
-        ) {
-          etude =
-            client.Etude.find((e) => e.modePaiement === 'comptant') ||
-            client.Etude[0];
-        } else if (client?.etudePerso) {
-          etude = client.etudePerso;
-        } else {
-          etude = {};
-        }
-        // Ajoute tags/jauges une seule fois avant le tableau
-        let blocHtml = '';
-        blocHtml += getTagsJaugesHtml(etude, {
-          production: etude.prodMoyenneKwh || '-',
-          anneeRentabilite: etude.anneeRentable || '-',
-        });
-        if (etude.tableauRentabiliteHtml) {
-          blocHtml += '<br /><br />' + etude.tableauRentabiliteHtml;
-        }
-        htmlContent += '<br />' + blocHtml;
-      }
       await fetch('/api/send-mail', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1366,6 +1339,9 @@ const FaireProposition = () => {
       }
     }
   };
+
+  // Ajout d'un état pour l'étude sélectionnée
+  const [selectedEtudeIdx, setSelectedEtudeIdx] = React.useState(0);
 
   return (
     <div style={{ padding: 32 }}>
@@ -1410,7 +1386,7 @@ const FaireProposition = () => {
         }}
       >
         <div style={{ flex: 1, minWidth: 280, maxWidth: 520 }}>
-          {/* Résumé client à gauche */}
+          {/* Résumé client à gauche + Sélection études */}
           {selectedClient && (
             <div
               style={{
@@ -1426,20 +1402,56 @@ const FaireProposition = () => {
               {(() => {
                 const client = clients.find((c) => c.id === selectedClient);
                 if (!client) return null;
-                let etude = null;
-                if (
-                  client.Etude &&
-                  Array.isArray(client.Etude) &&
-                  client.Etude.length > 0
-                ) {
-                  etude =
-                    client.Etude.find((e) => e.modePaiement === 'comptant') ||
-                    client.Etude[0];
+                // Section études multiples
+                let etudes = [];
+                if (client.Etude && Array.isArray(client.Etude) && client.Etude.length > 0) {
+                  etudes = client.Etude;
                 } else if (client.etudePerso) {
-                  etude = client.etudePerso;
-                } else {
-                  etude = {};
+                  etudes = [client.etudePerso];
                 }
+                // UI : liste des études sous forme de boutons ou cartes
+                if (etudes.length > 1) {
+                  return (
+                    <div style={{ marginBottom: 16 }}>
+                      <div style={{ fontWeight: 600, color: '#2563eb', marginBottom: 8 }}>
+                        Sélectionnez une étude à afficher :
+                      </div>
+                      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                        {etudes.map((etude, idx) => (
+                          <button
+                            key={idx}
+                            style={{
+                              padding: '8px 18px',
+                              borderRadius: 6,
+                              border: selectedEtudeIdx === idx ? '2px solid #2563eb' : '1px solid #d1d5db',
+                              background: selectedEtudeIdx === idx ? '#e0e7ff' : '#fff',
+                              color: '#2563eb',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                              boxShadow: selectedEtudeIdx === idx ? '0 2px 8px #2563eb22' : 'none',
+                            }}
+                            onClick={() => setSelectedEtudeIdx(idx)}
+                          >
+                            {etude.nomEtude || etude.modePaiement || `Étude ${idx + 1}`}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
+              {/* Affichage résumé de l'étude sélectionnée */}
+              {(() => {
+                const client = clients.find((c) => c.id === selectedClient);
+                if (!client) return null;
+                let etudes = [];
+                if (client.Etude && Array.isArray(client.Etude) && client.Etude.length > 0) {
+                  etudes = client.Etude;
+                } else if (client.etudePerso) {
+                  etudes = [client.etudePerso];
+                }
+                const etude = etudes[selectedEtudeIdx] || etudes[0] || {};
                 const labels = {
                   productionEstimee: "Production estimée à l'année",
                   consoAnnuelle: "KWh consommés à l'année",
@@ -1488,9 +1500,7 @@ const FaireProposition = () => {
                         'mensualiteEdf' in value[0])
                     )
                   ) {
-                    // On saute puissanceCentrale et stockage pour les afficher custom
-                    if (key === 'puissanceCentrale' || key === 'stockage')
-                      return;
+                    if (key === 'puissanceCentrale' || key === 'stockage') return;
                     autresDonnees.push(
                       <li key={key} style={{ marginBottom: 6 }}>
                         <span style={{ fontWeight: 500 }}>
@@ -1553,41 +1563,32 @@ const FaireProposition = () => {
         </div>
         <div style={{ flex: 1, minWidth: 320 }}>
           {/* Tableau de rentabilité à droite */}
-          {selectedClient &&
-            (() => {
-              const client = clients.find((c) => c.id === selectedClient);
-              if (!client) return null;
-              let etude = null;
-              if (
-                client.Etude &&
-                Array.isArray(client.Etude) &&
-                client.Etude.length > 0
-              ) {
-                etude =
-                  client.Etude.find((e) => e.modePaiement === 'comptant') ||
-                  client.Etude[0];
-              } else if (client.etudePerso) {
-                etude = client.etudePerso;
-              } else {
-                etude = {};
-              }
-              // Affiche uniquement le tableau HTML sauvegardé, sans fallback ni recalcul
-              if (etude.tableauRentabiliteHtml) {
-                return (
-                  <div>
-                    <h4 style={{ color: '#2563eb', marginBottom: 8 }}>
-                      Tableau de rentabilité
-                    </h4>
-                    <div
-                      dangerouslySetInnerHTML={{
-                        __html: etude.tableauRentabiliteHtml,
-                      }}
-                    />
-                  </div>
-                );
-              }
-              return null;
-            })()}
+          {selectedClient && (() => {
+            const client = clients.find((c) => c.id === selectedClient);
+            if (!client) return null;
+            let etudes = [];
+            if (client.Etude && Array.isArray(client.Etude) && client.Etude.length > 0) {
+              etudes = client.Etude;
+            } else if (client.etudePerso) {
+              etudes = [client.etudePerso];
+            }
+            const etude = etudes[selectedEtudeIdx] || etudes[0] || {};
+            if (etude.tableauRentabiliteHtml) {
+              return (
+                <div>
+                  <h4 style={{ color: '#2563eb', marginBottom: 8 }}>
+                    Tableau de rentabilité
+                  </h4>
+                  <div
+                    dangerouslySetInnerHTML={{
+                      __html: etude.tableauRentabiliteHtml,
+                    }}
+                  />
+                </div>
+              );
+            }
+            return null;
+          })()}
         </div>
       </div>
       <input
