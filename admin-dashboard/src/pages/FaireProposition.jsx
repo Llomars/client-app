@@ -289,6 +289,7 @@ const FaireProposition = () => {
   };
   const [devisFiles, setDevisFiles] = useState([]);
   const [selectedClient, setSelectedClient] = useState('');
+  const [searchClient, setSearchClient] = useState('');
   const [parsedDevis, setParsedDevis] = useState(null);
   const [clients, setClients] = useState([]);
   const [loadingClients, setLoadingClients] = useState(true);
@@ -1347,35 +1348,67 @@ const FaireProposition = () => {
     <div style={{ padding: 32 }}>
       <h2>Faire une proposition</h2>
       <p>
-        Importez un devis (Excel ou CSV), modifiez-le et associez-le à un
-        client.
+        Importez un devis (Excel ou CSV), modifiez-le et associez-le à un client.
       </p>
-      <div
-        style={{
-          marginBottom: 16,
-          display: 'flex',
-          alignItems: 'flex-start',
-          gap: 32,
-        }}
-      >
-        <div>
-          <label>Associer à un client : </label>
-          <select
-            value={selectedClient}
-            onChange={(e) => setSelectedClient(e.target.value)}
-            disabled={loadingClients}
-          >
-            <option value="">Sélectionner...</option>
-            {clients.map((c) => (
-              <option key={c.id} value={c.id}>
-                {(c.nom || '') + (c.prenom ? ' ' + c.prenom : '')}
-              </option>
-            ))}
-          </select>
-          {loadingClients && (
-            <span style={{ marginLeft: 8 }}>Chargement...</span>
+      <div style={{ marginBottom: 16, maxWidth: 400 }}>
+        <label style={{ fontWeight: 600, marginRight: 12 }}>
+          Associer à un client :
+        </label>
+        <input
+          type="text"
+          value={searchClient}
+          onChange={e => setSearchClient(e.target.value)}
+          placeholder="Rechercher par nom ou prénom..."
+          style={{
+            width: '100%',
+            padding: 8,
+            borderRadius: 6,
+            border: '1.5px solid #c7d2fe',
+            fontSize: 16,
+            marginBottom: 8,
+          }}
+        />
+        <div
+          style={{
+            maxHeight: 180,
+            overflowY: 'auto',
+            background: '#fff',
+            borderRadius: 6,
+            boxShadow: '0 2px 8px #c7d2fe33',
+          }}
+        >
+          {clients.filter(
+            c =>
+              (c.nom || '').toLowerCase().includes(searchClient.toLowerCase()) ||
+              (c.prenom || '').toLowerCase().includes(searchClient.toLowerCase())
+          ).length === 0 ? (
+            <div style={{ padding: 8, color: '#64748b' }}>Aucun client trouvé.</div>
+          ) : (
+            clients
+              .filter(
+                c =>
+                  (c.nom || '').toLowerCase().includes(searchClient.toLowerCase()) ||
+                  (c.prenom || '').toLowerCase().includes(searchClient.toLowerCase())
+              )
+              .map(c => (
+                <div
+                  key={c.id}
+                  style={{
+                    padding: 8,
+                    borderBottom: '1px solid #e0e7ff',
+                    cursor: 'pointer',
+                    background: selectedClient === c.id ? '#dbeafe' : '#fff',
+                  }}
+                  onClick={() => setSelectedClient(c.id)}
+                >
+                  <b>{c.nom} {c.prenom}</b> — {c.email}
+                </div>
+              ))
           )}
         </div>
+        {loadingClients && (
+          <span style={{ marginLeft: 8 }}>Chargement...</span>
+        )}
       </div>
       <div
         style={{
@@ -1404,7 +1437,11 @@ const FaireProposition = () => {
                 if (!client) return null;
                 // Section études multiples
                 let etudes = [];
-                if (client.Etude && Array.isArray(client.Etude) && client.Etude.length > 0) {
+                if (
+                  client.Etude &&
+                  Array.isArray(client.Etude) &&
+                  client.Etude.length > 0
+                ) {
                   etudes = client.Etude;
                 } else if (client.etudePerso) {
                   etudes = [client.etudePerso];
@@ -1413,26 +1450,43 @@ const FaireProposition = () => {
                 if (etudes.length > 1) {
                   return (
                     <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontWeight: 600, color: '#2563eb', marginBottom: 8 }}>
+                      <div
+                        style={{
+                          fontWeight: 600,
+                          color: '#2563eb',
+                          marginBottom: 8,
+                        }}
+                      >
                         Sélectionnez une étude à afficher :
                       </div>
-                      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                      <div
+                        style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}
+                      >
                         {etudes.map((etude, idx) => (
                           <button
                             key={idx}
                             style={{
                               padding: '8px 18px',
                               borderRadius: 6,
-                              border: selectedEtudeIdx === idx ? '2px solid #2563eb' : '1px solid #d1d5db',
-                              background: selectedEtudeIdx === idx ? '#e0e7ff' : '#fff',
+                              border:
+                                selectedEtudeIdx === idx
+                                  ? '2px solid #2563eb'
+                                  : '1px solid #d1d5db',
+                              background:
+                                selectedEtudeIdx === idx ? '#e0e7ff' : '#fff',
                               color: '#2563eb',
                               fontWeight: 600,
                               cursor: 'pointer',
-                              boxShadow: selectedEtudeIdx === idx ? '0 2px 8px #2563eb22' : 'none',
+                              boxShadow:
+                                selectedEtudeIdx === idx
+                                  ? '0 2px 8px #2563eb22'
+                                  : 'none',
                             }}
                             onClick={() => setSelectedEtudeIdx(idx)}
                           >
-                            {etude.nomEtude || etude.modePaiement || `Étude ${idx + 1}`}
+                            {etude.nomEtude ||
+                              etude.modePaiement ||
+                              `Étude ${idx + 1}`}
                           </button>
                         ))}
                       </div>
@@ -1446,7 +1500,11 @@ const FaireProposition = () => {
                 const client = clients.find((c) => c.id === selectedClient);
                 if (!client) return null;
                 let etudes = [];
-                if (client.Etude && Array.isArray(client.Etude) && client.Etude.length > 0) {
+                if (
+                  client.Etude &&
+                  Array.isArray(client.Etude) &&
+                  client.Etude.length > 0
+                ) {
                   etudes = client.Etude;
                 } else if (client.etudePerso) {
                   etudes = [client.etudePerso];
@@ -1500,7 +1558,8 @@ const FaireProposition = () => {
                         'mensualiteEdf' in value[0])
                     )
                   ) {
-                    if (key === 'puissanceCentrale' || key === 'stockage') return;
+                    if (key === 'puissanceCentrale' || key === 'stockage')
+                      return;
                     autresDonnees.push(
                       <li key={key} style={{ marginBottom: 6 }}>
                         <span style={{ fontWeight: 500 }}>
@@ -1563,32 +1622,37 @@ const FaireProposition = () => {
         </div>
         <div style={{ flex: 1, minWidth: 320 }}>
           {/* Tableau de rentabilité à droite */}
-          {selectedClient && (() => {
-            const client = clients.find((c) => c.id === selectedClient);
-            if (!client) return null;
-            let etudes = [];
-            if (client.Etude && Array.isArray(client.Etude) && client.Etude.length > 0) {
-              etudes = client.Etude;
-            } else if (client.etudePerso) {
-              etudes = [client.etudePerso];
-            }
-            const etude = etudes[selectedEtudeIdx] || etudes[0] || {};
-            if (etude.tableauRentabiliteHtml) {
-              return (
-                <div>
-                  <h4 style={{ color: '#2563eb', marginBottom: 8 }}>
-                    Tableau de rentabilité
-                  </h4>
-                  <div
-                    dangerouslySetInnerHTML={{
-                      __html: etude.tableauRentabiliteHtml,
-                    }}
-                  />
-                </div>
-              );
-            }
-            return null;
-          })()}
+          {selectedClient &&
+            (() => {
+              const client = clients.find((c) => c.id === selectedClient);
+              if (!client) return null;
+              let etudes = [];
+              if (
+                client.Etude &&
+                Array.isArray(client.Etude) &&
+                client.Etude.length > 0
+              ) {
+                etudes = client.Etude;
+              } else if (client.etudePerso) {
+                etudes = [client.etudePerso];
+              }
+              const etude = etudes[selectedEtudeIdx] || etudes[0] || {};
+              if (etude.tableauRentabiliteHtml) {
+                return (
+                  <div>
+                    <h4 style={{ color: '#2563eb', marginBottom: 8 }}>
+                      Tableau de rentabilité
+                    </h4>
+                    <div
+                      dangerouslySetInnerHTML={{
+                        __html: etude.tableauRentabiliteHtml,
+                      }}
+                    />
+                  </div>
+                );
+              }
+              return null;
+            })()}
         </div>
       </div>
       <input
