@@ -37,7 +37,9 @@ function Calculateur() {
       setLoadingParams(true);
       try {
         const ref = doc(db, 'config', PARAMS_DOC_ID);
-        const snap = await import('firebase/firestore').then(({ getDoc }) => getDoc(ref));
+        const snap = await import('firebase/firestore').then(({ getDoc }) =>
+          getDoc(ref)
+        );
         if (snap.exists()) {
           const data = snap.data();
           setPrime3Admin(data.prime3 ?? null);
@@ -55,12 +57,14 @@ function Calculateur() {
   const saveParams = async () => {
     try {
       const ref = doc(db, 'config', PARAMS_DOC_ID);
-      await import('firebase/firestore').then(({ setDoc }) => setDoc(ref, {
-        prime3: prime3Admin,
-        prime6: prime6Admin,
-        prime9: prime9Admin,
-        tarifRachat: tarifRachatAdmin,
-      }));
+      await import('firebase/firestore').then(({ setDoc }) =>
+        setDoc(ref, {
+          prime3: prime3Admin,
+          prime6: prime6Admin,
+          prime9: prime9Admin,
+          tarifRachat: tarifRachatAdmin,
+        })
+      );
       alert('Paramètres enregistrés !');
     } catch (e) {
       alert('Erreur enregistrement Firestore');
@@ -500,6 +504,19 @@ function Calculateur() {
         (acc, row) => acc + (row.coutEdf || 0),
         0
       );
+      const totalDiff = rentabilite.reduce(
+        (acc, row) => acc + (row.diff || 0),
+        0
+      );
+      // Nouvelle ligne : Cumul revente sur 20 ans
+      docPdf.setTextColor(191, 161, 0);
+      docPdf.text('Cumul revente (20 ans)', 82, rowY2 + 5);
+      docPdf.text(`${totalRevente.toFixed(2)} €`, 110, rowY2 + 5);
+      // Nouvelle ligne : Total économies + revente (en bas à droite)
+      const totalEcosRevente = totalDiff + totalRevente;
+      docPdf.setTextColor(16, 185, 129);
+      docPdf.text('Total économies + revente', 150, rowY2 + 5);
+      docPdf.text(`${totalEcosRevente.toFixed(2)} €`, 200, rowY2 + 5);
       // Message rassurant
       let msgY = rowY2 + 18;
       docPdf.setFont('helvetica', 'normal');
@@ -977,7 +994,7 @@ function Calculateur() {
       label: '3 KWh 0',
       value: '3KWh-0',
       prix: 7500,
-  prime: prime3Admin !== null ? prime3Admin : 4830,
+      prime: prime3Admin !== null ? prime3Admin : 4830,
       composition: [
         'Panneaux de 500W x 6',
         'Onduleur de 3Kwh',
@@ -995,7 +1012,7 @@ function Calculateur() {
       label: '3 KWh 1',
       value: '3KWh-1',
       prix: 9500,
-  prime: prime3Admin !== null ? prime3Admin : 4830,
+      prime: prime3Admin !== null ? prime3Admin : 4830,
       composition: [
         'Panneaux de 500W x 6',
         'Batterie de 5Kwh',
@@ -1014,7 +1031,7 @@ function Calculateur() {
       label: '6 KWh 0',
       value: '6KWh-0',
       prix: 12000,
-  prime: prime6Admin !== null ? prime6Admin : 5760,
+      prime: prime6Admin !== null ? prime6Admin : 5760,
       composition: [
         'Panneaux de 500W x 12',
         'Onduleur de 6Kwh',
@@ -1032,7 +1049,7 @@ function Calculateur() {
       label: '6 KWh 1',
       value: '6KWh-1',
       prix: 15000,
-  prime: prime6Admin !== null ? prime6Admin : 5760,
+      prime: prime6Admin !== null ? prime6Admin : 5760,
       composition: [
         'Panneaux de 500W x 12',
         'Batterie de 5Kwh',
@@ -1051,7 +1068,7 @@ function Calculateur() {
       label: '6 KWh 2',
       value: '6KWh-2',
       prix: 16000,
-  prime: prime6Admin !== null ? prime6Admin : 5760,
+      prime: prime6Admin !== null ? prime6Admin : 5760,
       composition: [
         'Panneaux de 500W x 12',
         'Batterie de 10Kwh',
@@ -1070,7 +1087,7 @@ function Calculateur() {
       label: '9 KWh 0',
       value: '9KWh-0',
       prix: 16500,
-  prime: prime9Admin !== null ? prime9Admin : 8640,
+      prime: prime9Admin !== null ? prime9Admin : 8640,
       composition: [
         'Panneaux de 500W x 18',
         'Onduleur de 6Kwh',
@@ -1089,7 +1106,7 @@ function Calculateur() {
       label: '9 KWh 1',
       value: '9KWh-1',
       prix: 22000,
-  prime: prime9Admin !== null ? prime9Admin : 8640,
+      prime: prime9Admin !== null ? prime9Admin : 8640,
       composition: [
         'Panneaux de 500W x 18',
         'Batterie de 5Kwh',
@@ -1109,7 +1126,7 @@ function Calculateur() {
       label: '9 KWh 2',
       value: '9KWh-2',
       prix: 24000,
-  prime: prime9Admin !== null ? prime9Admin : 8640,
+      prime: prime9Admin !== null ? prime9Admin : 8640,
       composition: [
         'Panneaux de 500W x 18',
         'Batterie de 10Kwh',
@@ -1129,7 +1146,7 @@ function Calculateur() {
       label: '12 KWh 0',
       value: '12KWh-0',
       prix: 22000,
-  prime: prime9Admin !== null ? prime9Admin : 6840,
+      prime: prime9Admin !== null ? prime9Admin : 6840,
       composition: [
         'Panneaux de 500W x 24',
         'Onduleur de 6Kwh x 2',
@@ -1147,7 +1164,7 @@ function Calculateur() {
       label: '12 KWh 2',
       value: '12KWh-2',
       prix: 30000,
-  prime: prime9Admin !== null ? prime9Admin : 6840,
+      prime: prime9Admin !== null ? prime9Admin : 6840,
       composition: [
         'Panneaux de 500W x 24',
         'Batterie de 10KWh',
@@ -1226,7 +1243,9 @@ function Calculateur() {
         }
       );
     } else {
-      setAdresseError("La géolocalisation n'est pas supportée par ce navigateur");
+      setAdresseError(
+        "La géolocalisation n'est pas supportée par ce navigateur"
+      );
     }
   };
   const [adresseError, setAdresseError] = useState('');
@@ -1434,8 +1453,8 @@ function Calculateur() {
         coutCentrale: Number(coutCentrale),
         prixEdfCts: (prixEdf * 100).toFixed(1),
         reventeEstimee:
-          gainRevente !== '' ? Number(gainRevente).toFixed(2) : '0.00',
-        diff: (Number(coutEdf) - Number(coutCentrale)).toFixed(2),
+          gainRevente !== '' ? Number(gainRevente) : 0,
+        diff: Number(coutEdf) - Number(coutCentrale),
         mensualiteEdf,
         mensualiteCentrale,
       });
@@ -1714,7 +1733,8 @@ function Calculateur() {
     const rows = [];
     // Détermine le prix de revente selon le kit
     let prixRevente = tarifRachatAdmin !== null ? tarifRachatAdmin : 0.1741; // défaut 3,6,9kW
-    if (kit.startsWith('12KWh')) prixRevente = tarifRachatAdmin !== null ? tarifRachatAdmin : 0.0894;
+    if (kit.startsWith('12KWh'))
+      prixRevente = tarifRachatAdmin !== null ? tarifRachatAdmin : 0.0894;
     // Nouvelle logique : remboursement anticipé de la prime à partir de la 2e année
     let montantRestant = montantFinance;
     let moisRestant = mois;
@@ -2199,6 +2219,7 @@ function Calculateur() {
                     html += `<th style='border:1px solid #d1d5db;padding:6px 12px;font-weight:600;background:#e0e7ff;color:#2563eb;'>${col.label}</th>`;
                   });
                   html += `</tr></thead><tbody>`;
+                  let cumulRevente = 0;
                   rentabilite.forEach((row, idx) => {
                     if (paiementComptant) {
                       cumul +=
@@ -2211,6 +2232,7 @@ function Calculateur() {
                     } else {
                       cumul += Number(row.diff) || 0;
                     }
+                    cumulRevente += Number(row.reventeEstimee) || 0;
                     html += `<tr>`;
                     columns.forEach((col) => {
                       let val = row[col.key];
@@ -2258,6 +2280,18 @@ function Calculateur() {
                     });
                     html += `</tr>`;
                   });
+                  // Ligne cumul revente sur 20 ans
+                  html += `<tr style='background:#fffbe6;font-weight:900;'>`;
+                  columns.forEach((col, idx) => {
+                    if (col.key === 'reventeEstimee') {
+                      html += `<td colspan='1' style='border:1.5px solid #ffe58f;padding:8px 12px;font-size:17px;font-weight:900;color:#bfa100;text-align:center;'>Cumul revente sur 20 ans : ${cumulRevente.toLocaleString()} €</td>`;
+                    } else if (idx === columns.length - 1) {
+                      html += `<td style='border:1.5px solid #ffe58f;padding:8px 12px;font-size:17px;font-weight:900;color:#0e7490;text-align:center;'>Total économies + revente : ${(rentabilite.reduce((sum, row) => sum + ((Number(row.diff) || 0) + (Number(row.reventeEstimee) || 0)), 0)).toLocaleString()} €</td>`;
+                    } else {
+                      html += `<td></td>`;
+                    }
+                  });
+                  html += `</tr>`;
                   html += `</tbody></table>`;
                   // Ajout du cumul coût EDF, du retour sur investissement total, et du cumul Différence+Revente estimée sur 20 ans
                   const totalCoutEdf = rentabilite.reduce(
@@ -2581,19 +2615,130 @@ function Calculateur() {
       >
         {/* Champs admin pour prime et tarif de rachat */}
         {role === 'admin' && (
-          <div style={{ background: '#f1f5f9', borderRadius: 12, padding: 18, marginBottom: 24, maxWidth: 340 }}>
-            <h4 style={{ color: '#3730a3', fontWeight: 700, fontSize: 18, marginBottom: 12 }}>Paramètres administrateur</h4>
-            <label style={{ fontWeight: 600, color: '#0e7490', fontSize: 15 }}>Prime 3 kWc (€)</label>
-            <input type="number" value={prime3Admin ?? ''} onChange={e => setPrime3Admin(e.target.value ? Number(e.target.value) : null)} min={0} step={1} style={{ marginBottom: 12, width: 120, fontSize: 16, padding: 4, borderRadius: 4, border: '1px solid #c7d2fe' }} />
-            <label style={{ fontWeight: 600, color: '#0e7490', fontSize: 15 }}>Prime 6 kWc (€)</label>
-            <input type="number" value={prime6Admin ?? ''} onChange={e => setPrime6Admin(e.target.value ? Number(e.target.value) : null)} min={0} step={1} style={{ marginBottom: 12, width: 120, fontSize: 16, padding: 4, borderRadius: 4, border: '1px solid #c7d2fe' }} />
-            <label style={{ fontWeight: 600, color: '#0e7490', fontSize: 15 }}>Prime 9 kWc (€)</label>
-            <input type="number" value={prime9Admin ?? ''} onChange={e => setPrime9Admin(e.target.value ? Number(e.target.value) : null)} min={0} step={1} style={{ marginBottom: 12, width: 120, fontSize: 16, padding: 4, borderRadius: 4, border: '1px solid #c7d2fe' }} />
-            <label style={{ fontWeight: 600, color: '#0e7490', fontSize: 15 }}>Tarif de rachat (€ / kWh)</label>
-            <input type="number" value={tarifRachatAdmin ?? ''} onChange={e => setTarifRachatAdmin(e.target.value ? Number(e.target.value) : null)} min={0} step={0.0001} style={{ width: 120, fontSize: 16, padding: 4, borderRadius: 4, border: '1px solid #c7d2fe' }} />
-            <button onClick={saveParams} style={{ marginTop: 16, background: '#10b981', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 800, fontSize: 16, cursor: 'pointer' }}>Enregistrer</button>
-            <div style={{ fontSize: 13, color: '#64748b', marginTop: 8 }}>Ces valeurs sont appliquées à tous les calculs et utilisateurs.</div>
-            {loadingParams && <div style={{ color: '#6366f1', marginTop: 8 }}>Chargement paramètres...</div>}
+          <div
+            style={{
+              background: '#f1f5f9',
+              borderRadius: 12,
+              padding: 18,
+              marginBottom: 24,
+              maxWidth: 340,
+            }}
+          >
+            <h4
+              style={{
+                color: '#3730a3',
+                fontWeight: 700,
+                fontSize: 18,
+                marginBottom: 12,
+              }}
+            >
+              Paramètres administrateur
+            </h4>
+            <label style={{ fontWeight: 600, color: '#0e7490', fontSize: 15 }}>
+              Prime 3 kWc (€)
+            </label>
+            <input
+              type="number"
+              value={prime3Admin ?? ''}
+              onChange={(e) =>
+                setPrime3Admin(e.target.value ? Number(e.target.value) : null)
+              }
+              min={0}
+              step={1}
+              style={{
+                marginBottom: 12,
+                width: 120,
+                fontSize: 16,
+                padding: 4,
+                borderRadius: 4,
+                border: '1px solid #c7d2fe',
+              }}
+            />
+            <label style={{ fontWeight: 600, color: '#0e7490', fontSize: 15 }}>
+              Prime 6 kWc (€)
+            </label>
+            <input
+              type="number"
+              value={prime6Admin ?? ''}
+              onChange={(e) =>
+                setPrime6Admin(e.target.value ? Number(e.target.value) : null)
+              }
+              min={0}
+              step={1}
+              style={{
+                marginBottom: 12,
+                width: 120,
+                fontSize: 16,
+                padding: 4,
+                borderRadius: 4,
+                border: '1px solid #c7d2fe',
+              }}
+            />
+            <label style={{ fontWeight: 600, color: '#0e7490', fontSize: 15 }}>
+              Prime 9 kWc (€)
+            </label>
+            <input
+              type="number"
+              value={prime9Admin ?? ''}
+              onChange={(e) =>
+                setPrime9Admin(e.target.value ? Number(e.target.value) : null)
+              }
+              min={0}
+              step={1}
+              style={{
+                marginBottom: 12,
+                width: 120,
+                fontSize: 16,
+                padding: 4,
+                borderRadius: 4,
+                border: '1px solid #c7d2fe',
+              }}
+            />
+            <label style={{ fontWeight: 600, color: '#0e7490', fontSize: 15 }}>
+              Tarif de rachat (€ / kWh)
+            </label>
+            <input
+              type="number"
+              value={tarifRachatAdmin ?? ''}
+              onChange={(e) =>
+                setTarifRachatAdmin(
+                  e.target.value ? Number(e.target.value) : null
+                )
+              }
+              min={0}
+              step={0.0001}
+              style={{
+                width: 120,
+                fontSize: 16,
+                padding: 4,
+                borderRadius: 4,
+                border: '1px solid #c7d2fe',
+              }}
+            />
+            <button
+              onClick={saveParams}
+              style={{
+                marginTop: 16,
+                background: '#10b981',
+                color: '#fff',
+                border: 'none',
+                borderRadius: 8,
+                padding: '10px 24px',
+                fontWeight: 800,
+                fontSize: 16,
+                cursor: 'pointer',
+              }}
+            >
+              Enregistrer
+            </button>
+            <div style={{ fontSize: 13, color: '#64748b', marginTop: 8 }}>
+              Ces valeurs sont appliquées à tous les calculs et utilisateurs.
+            </div>
+            {loadingParams && (
+              <div style={{ color: '#6366f1', marginTop: 8 }}>
+                Chargement paramètres...
+              </div>
+            )}
           </div>
         )}
         {/* Colonne principale infos centrale/client */}
@@ -3626,11 +3771,11 @@ function Calculateur() {
                           <td
                             style={{
                               padding: 8,
-                              color: diff < 0 ? '#dc2626' : '#10b981',
+                              color: typeof diff === 'number' && diff < 0 ? '#dc2626' : '#10b981',
                               fontWeight: 700,
                             }}
                           >
-                            {diff.toFixed(2)} €
+                            {typeof diff === 'number' && !isNaN(diff) ? diff.toFixed(2) : '-'} €
                           </td>
                         </tr>
                       );
@@ -3652,7 +3797,7 @@ function Calculateur() {
                   <tr style={{ background: '#fef9c3', fontWeight: 900 }}>
                     <td style={{ padding: 8 }}>Total 20 ans</td>
                     {/* Total coût EDF */}
-                    <td style={{ padding: 8, color: '#3730a3' }}>
+                    <td style={{ padding: 8, color: '#dc2626', fontWeight: 900 }}>
                       {rentabilite
                         .reduce((acc, row) => acc + (row.coutEdf || 0), 0)
                         .toLocaleString()}{' '}
@@ -3660,117 +3805,53 @@ function Calculateur() {
                     </td>
                     <td style={{ padding: 8 }}>-</td>
                     {/* Total retour sur investissement sur 20 ans (valeur finale en 2045) */}
-                    <td
-                      style={{ padding: 8, color: '#10b981', fontWeight: 900 }}
-                    >
-                      {paiementComptant &&
-                        (() => {
-                          // On récupère la valeur de la dernière ligne du tableau (dernier solde calculé)
-                          let lastSolde = null;
-                          let prixEdfBase = 0.25;
-                          let consoReelle = conso ? Number(conso) : 0;
-                          let solde = prixNet;
-                          for (let i = 0; i < rentabilite.length; i++) {
-                            let prixEdfAnnee = modeAugmentation
-                              ? prixEdfBase * Math.pow(1.05, i)
-                              : prixEdfBase;
-                            let economieEDF =
-                              Math.min(prodMoyenneKwh, consoReelle) *
-                              prixEdfAnnee;
-                            let primeAnnee = i === 1 ? prime : 0;
-                            let revente = rentabilite[i].reventeEstimee || 0;
-                            let residuelEDFAn =
-                              consoNuitJour > capaciteBatterie
-                                ? (consoNuitJour - capaciteBatterie) * 365
-                                : 0;
-                            let coutResiduelEDF = residuelEDFAn * prixEdfAnnee;
-                            solde -=
-                              economieEDF +
-                              primeAnnee +
-                              revente -
-                              coutResiduelEDF;
-                            lastSolde = solde;
-                          }
-                          return lastSolde !== null
-                            ? lastSolde
-                                .toLocaleString(undefined, {
-                                  minimumFractionDigits: 0,
-                                  maximumFractionDigits: 0,
-                                })
-                                .replace('-', '') + ' €'
-                            : '-';
-                        })()}
+                    <td style={{ padding: 8, color: '#10b981', fontWeight: 900 }}>
+                      {paiementComptant && (() => {
+                        let lastSolde = null;
+                        let prixEdfBase = 0.25;
+                        let consoReelle = conso ? Number(conso) : 0;
+                        let solde = prixNet;
+                        for (let i = 0; i < rentabilite.length; i++) {
+                          let prixEdfAnnee = modeAugmentation
+                            ? prixEdfBase * Math.pow(1.05, i)
+                            : prixEdfBase;
+                          let economieEDF = Math.min(prodMoyenneKwh, consoReelle) * prixEdfAnnee;
+                          let primeAnnee = i === 1 ? prime : 0;
+                          let revente = rentabilite[i].reventeEstimee || 0;
+                          let residuelEDFAn = consoNuitJour > capaciteBatterie ? (consoNuitJour - capaciteBatterie) * 365 : 0;
+                          let coutResiduelEDF = residuelEDFAn * prixEdfAnnee;
+                          solde -= economieEDF + primeAnnee + revente - coutResiduelEDF;
+                          lastSolde = solde;
+                        }
+                        return lastSolde !== null ? lastSolde.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }).replace('-', '') + ' €' : '-';
+                      })()}
                     </td>
-                    <td style={{ padding: 8, color: '#10b981' }}>-</td>
-                    <td style={{ padding: 8, color: '#dc2626' }}>-</td>
-                    <td
-                      style={{ padding: 8, color: '#bfa100', fontWeight: 900 }}
-                    >
-                      -
+                    {/* Cumul économies seul = coût total EDF - coût total centrale */}
+                    <td style={{ padding: 8, color: '#10b981', fontWeight: 900, textAlign: 'center' }}>
+                      {(() => {
+                        const totalEdf = rentabilite.reduce((acc, row) => acc + (row.coutEdf || 0), 0);
+                        const totalCentrale = rentabilite.reduce((acc, row) => acc + (row.coutCentrale || 0), 0);
+                        const economies = totalEdf - totalCentrale;
+                        return economies.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' €';
+                      })()}
+                      <div style={{ fontSize: 13, color: '#10b981', fontWeight: 700 }}>Cumul économies 20 ans</div>
+                    </td>
+                    {/* Cumul revente sur 20 ans */}
+                    <td style={{ padding: 8, color: '#bfa100', fontWeight: 900, textAlign: 'center' }}>
+                      {rentabilite.reduce((acc, row) => acc + (Number(row.reventeEstimee) || 0), 0).toLocaleString()} €
+                      <div style={{ fontSize: 13, color: '#bfa100', fontWeight: 700 }}>Cumul revente 20 ans</div>
                     </td>
                     {/* Total économies EDF + Gains (tout en bas à droite) */}
-                    <td
-                      style={{ padding: 8, color: '#0e7490', fontWeight: 900 }}
-                    >
-                      {paiementComptant
-                        ? (() => {
-                            let prixEdfBase = 0.25;
-                            let consoReelle = conso ? Number(conso) : 0;
-                            let total = 0;
-                            for (let i = 0; i < rentabilite.length; i++) {
-                              let prixEdfAnnee = modeAugmentation
-                                ? prixEdfBase * Math.pow(1.05, i)
-                                : prixEdfBase;
-                              let economieEDF =
-                                Math.min(prodMoyenneKwh, consoReelle) *
-                                prixEdfAnnee;
-                              let primeAnnee = i === 1 ? prime : 0;
-                              let revente = rentabilite[i].reventeEstimee || 0;
-                              let residuelEDFAn =
-                                consoNuitJour > capaciteBatterie
-                                  ? (consoNuitJour - capaciteBatterie) * 365
-                                  : 0;
-                              let coutResiduelEDF =
-                                residuelEDFAn * prixEdfAnnee;
-                              total +=
-                                economieEDF +
-                                primeAnnee +
-                                revente -
-                                coutResiduelEDF;
-                            }
-                            return (
-                              total.toLocaleString(undefined, {
-                                minimumFractionDigits: 0,
-                                maximumFractionDigits: 0,
-                              }) + ' €'
-                            );
-                          })()
-                        : (() => {
-                            let prixEdfBase = 0.25;
-                            let totalDiff = 0;
-                            for (let i = 0; i < rentabilite.length; i++) {
-                              let prixEdfAnnee = modeAugmentation
-                                ? prixEdfBase * Math.pow(1.05, i)
-                                : prixEdfBase;
-                              let residuelEDFAn =
-                                consoNuitJour > capaciteBatterie
-                                  ? (consoNuitJour - capaciteBatterie) * 365
-                                  : 0;
-                              let coutResiduelEDF =
-                                residuelEDFAn * prixEdfAnnee;
-                              let diff =
-                                rentabilite[i].coutEdf -
-                                (rentabilite[i].coutCentrale || 0) -
-                                coutResiduelEDF;
-                              totalDiff += diff;
-                            }
-                            return (
-                              totalDiff.toLocaleString(undefined, {
-                                minimumFractionDigits: 0,
-                                maximumFractionDigits: 0,
-                              }) + ' €'
-                            );
-                          })()}
+                    <td style={{ padding: 8, color: '#0e7490', fontWeight: 900, textAlign: 'center' }}>
+                      {(() => {
+                        const totalEdf = rentabilite.reduce((acc, row) => acc + (row.coutEdf || 0), 0);
+                        const totalCentrale = rentabilite.reduce((acc, row) => acc + (row.coutCentrale || 0), 0);
+                        const economies = totalEdf - totalCentrale;
+                        const revente = rentabilite.reduce((acc, row) => acc + (Number(row.reventeEstimee) || 0), 0);
+                        const total = economies + revente;
+                        return total.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' €';
+                      })()}
+                      <div style={{ fontSize: 13, color: '#0e7490', fontWeight: 700 }}>Total économies + revente</div>
                     </td>
                   </tr>
                 </tfoot>
@@ -3918,16 +3999,6 @@ function Calculateur() {
                 <select
                   value={banque}
                   onChange={handleBanqueChange}
-                  style={{
-                    padding: 10,
-                    borderRadius: 10,
-                    border: '1.5px solid #6366f1',
-                    fontSize: 16,
-                    background: '#fff',
-                    color: '#3730a3',
-                    fontWeight: 700,
-                    boxShadow: '0 2px 8px #e0e7ff',
-                  }}
                 >
                   {banques.map((bk) => (
                     <option key={bk.nom} value={bk.nom}>
