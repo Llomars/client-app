@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import ChartRentabiliteBar from '../components/ChartRentabiliteBar.jsx';
+import ChartBreakEven from '../components/ChartBreakEven.jsx';
+import ChartKwhRoi from '../components/ChartKwhRoi.jsx';
 import { getAuth } from 'firebase/auth';
 import { getFirestore, getDocs, collection, addDoc } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
@@ -210,6 +213,10 @@ function getVisualTags(etude) {
 
 // Page "Faire une proposition" pour importer et gérer des devis
 const FaireProposition = () => {
+  // Refs pour les graphiques (pour export PNG)
+  const chartKwhRoiRef = React.createRef();
+  const chartRentabiliteBarRef = React.createRef();
+  const chartBreakEvenRef = React.createRef();
   // --- Données visuelles pour bandeau et jauge ---
   const getEtudeData = () => {
     const client = clients.find((c) => c.id === selectedClient);
@@ -875,8 +882,46 @@ const FaireProposition = () => {
     mail = mail.replace(/«\s*([^»]+)\s*»/g, '$1');
     // Ajoute SEULEMENT le tableau HTML sauvegardé à la fin du mail (si demandé),
     // les tags/jauges restent uniquement au début via le scriptMail
-    if (includeTableInMail && etude && etude.tableauRentabiliteHtml) {
-      mail += '<br />' + etude.tableauRentabiliteHtml;
+    // Récupère les études sélectionnées pour le mail
+    let etudes = [];
+    if (
+      client.etudes &&
+      Array.isArray(client.etudes) &&
+      client.etudes.length > 0
+    ) {
+      etudes = client.etudes;
+    } else if (client.etudePerso) {
+      etudes = [client.etudePerso];
+    }
+    const selectedEtudes =
+      selectedEtudesIdx.length > 0
+        ? selectedEtudesIdx.map((idx) => etudes[idx])
+        : [etudes[0]];
+    if (includeTableInMail && Array.isArray(selectedEtudes) && selectedEtudes.length > 0) {
+      selectedEtudes.forEach((etude, idx) => {
+        if (etude && etude.tableauRentabiliteHtml) {
+          mail += '<br />' + etude.tableauRentabiliteHtml;
+          // Ajout des images des graphiques pour chaque étude
+          // On suppose que chaque graphique a un ref unique par étude (ex: chartKwhRoiRef[idx])
+          // Si ce n'est pas le cas, on récupère le canvas du DOM par une classe ou un id unique
+          const roiCanvas = document.querySelector(`#chartKwhRoi-${idx} canvas`);
+          const barCanvas = document.querySelector(`#chartRentabiliteBar-${idx} canvas`);
+          const breakEvenCanvas = document.querySelector(`#chartBreakEven-${idx} canvas`);
+          // Mise en page : 2 graphiques côte à côte, le 3e en dessous et plus grand
+          let graphRow = '<div style="display:flex;gap:24px;flex-wrap:wrap;justify-content:center;margin:24px 0;">';
+          if (roiCanvas) {
+            graphRow += `<div style="flex:1 1 600px;max-width:700px;"><img src="${roiCanvas.toDataURL()}" style="width:100%;min-width:400px;max-width:700px;border-radius:18px;box-shadow:0 4px 24px #0003;" alt="Graphique ROI/kWh" /></div>`;
+          }
+          if (barCanvas) {
+            graphRow += `<div style="flex:1 1 600px;max-width:700px;"><img src="${barCanvas.toDataURL()}" style="width:100%;min-width:400px;max-width:700px;border-radius:18px;box-shadow:0 4px 24px #0003;" alt="Graphique économies cumulées" /></div>`;
+          }
+          graphRow += '</div>';
+          if (breakEvenCanvas) {
+            graphRow += `<div style=\"margin:40px auto;max-width:900px;\"><img src=\"${breakEvenCanvas.toDataURL()}\" style=\"width:100%;min-width:600px;max-width:900px;border-radius:24px;box-shadow:0 6px 32px #0004;\" alt=\"Graphique break-even\" /></div>`;
+          }
+          mail += graphRow;
+        }
+      });
     }
     setMailContent(mail);
   }, [selectedClient, clients, scriptMail, includeTableInMail]);
@@ -1341,14 +1386,15 @@ const FaireProposition = () => {
     }
   };
 
-  // Ajout d'un état pour l'étude sélectionnée
-  const [selectedEtudeIdx, setSelectedEtudeIdx] = React.useState(0);
+  // Ajout d'un état pour les études sélectionnées (multi-sélection)
+  const [selectedEtudesIdx, setSelectedEtudesIdx] = React.useState([]);
 
   return (
     <div style={{ padding: 32 }}>
       <h2>Faire une proposition</h2>
       <p>
-        Importez un devis (Excel ou CSV), modifiez-le et associez-le à un client.
+        Importez un devis (Excel ou CSV), modifiez-le et associez-le à un
+        client.
       </p>
       <div style={{ marginBottom: 16, maxWidth: 400 }}>
         <label style={{ fontWeight: 600, marginRight: 12 }}>
@@ -1357,7 +1403,7 @@ const FaireProposition = () => {
         <input
           type="text"
           value={searchClient}
-          onChange={e => setSearchClient(e.target.value)}
+          onChange={(e) => setSearchClient(e.target.value)}
           placeholder="Rechercher par nom ou prénom..."
           style={{
             width: '100%',
@@ -1378,19 +1424,29 @@ const FaireProposition = () => {
           }}
         >
           {clients.filter(
-            c =>
-              (c.nom || '').toLowerCase().includes(searchClient.toLowerCase()) ||
-              (c.prenom || '').toLowerCase().includes(searchClient.toLowerCase())
+            (c) =>
+              (c.nom || '')
+                .toLowerCase()
+                .includes(searchClient.toLowerCase()) ||
+              (c.prenom || '')
+                .toLowerCase()
+                .includes(searchClient.toLowerCase())
           ).length === 0 ? (
-            <div style={{ padding: 8, color: '#64748b' }}>Aucun client trouvé.</div>
+            <div style={{ padding: 8, color: '#64748b' }}>
+              Aucun client trouvé.
+            </div>
           ) : (
             clients
               .filter(
-                c =>
-                  (c.nom || '').toLowerCase().includes(searchClient.toLowerCase()) ||
-                  (c.prenom || '').toLowerCase().includes(searchClient.toLowerCase())
+                (c) =>
+                  (c.nom || '')
+                    .toLowerCase()
+                    .includes(searchClient.toLowerCase()) ||
+                  (c.prenom || '')
+                    .toLowerCase()
+                    .includes(searchClient.toLowerCase())
               )
-              .map(c => (
+              .map((c) => (
                 <div
                   key={c.id}
                   style={{
@@ -1401,14 +1457,15 @@ const FaireProposition = () => {
                   }}
                   onClick={() => setSelectedClient(c.id)}
                 >
-                  <b>{c.nom} {c.prenom}</b> — {c.email}
+                  <b>
+                    {c.nom} {c.prenom}
+                  </b>{' '}
+                  — {c.email}
                 </div>
               ))
           )}
         </div>
-        {loadingClients && (
-          <span style={{ marginLeft: 8 }}>Chargement...</span>
-        )}
+        {loadingClients && <span style={{ marginLeft: 8 }}>Chargement...</span>}
       </div>
       <div
         style={{
@@ -1419,7 +1476,7 @@ const FaireProposition = () => {
         }}
       >
         <div style={{ flex: 1, minWidth: 280, maxWidth: 520 }}>
-          {/* Résumé client à gauche + Sélection études */}
+          {/* Résumé client à gauche + Sélection études (multi) */}
           {selectedClient && (
             <div
               style={{
@@ -1435,19 +1492,17 @@ const FaireProposition = () => {
               {(() => {
                 const client = clients.find((c) => c.id === selectedClient);
                 if (!client) return null;
-                // Section études multiples
                 let etudes = [];
                 if (
-                  client.Etude &&
-                  Array.isArray(client.Etude) &&
-                  client.Etude.length > 0
+                  client.etudes &&
+                  Array.isArray(client.etudes) &&
+                  client.etudes.length > 0
                 ) {
-                  etudes = client.Etude;
+                  etudes = client.etudes;
                 } else if (client.etudePerso) {
                   etudes = [client.etudePerso];
                 }
-                // UI : liste des études sous forme de boutons ou cartes
-                if (etudes.length > 1) {
+                if (etudes.length > 0) {
                   return (
                     <div style={{ marginBottom: 16 }}>
                       <div
@@ -1457,45 +1512,114 @@ const FaireProposition = () => {
                           marginBottom: 8,
                         }}
                       >
-                        Sélectionnez une étude à afficher :
+                        Sélectionnez les études à inclure dans la proposition :
                       </div>
                       <div
-                        style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}
+                        style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}
                       >
-                        {etudes.map((etude, idx) => (
-                          <button
-                            key={idx}
-                            style={{
-                              padding: '8px 18px',
-                              borderRadius: 6,
-                              border:
-                                selectedEtudeIdx === idx
+                        {etudes.map((etude, idx) => {
+                          const selected = selectedEtudesIdx.includes(idx);
+                          return (
+                            <div
+                              key={idx}
+                              onClick={() => {
+                                setSelectedEtudesIdx((prev) =>
+                                  selected
+                                    ? prev.filter((i) => i !== idx)
+                                    : [...prev, idx]
+                                );
+                              }}
+                              style={{
+                                minWidth: 180,
+                                maxWidth: 220,
+                                background: selected ? '#e0e7ff' : '#fff',
+                                border: selected
                                   ? '2px solid #2563eb'
                                   : '1px solid #d1d5db',
-                              background:
-                                selectedEtudeIdx === idx ? '#e0e7ff' : '#fff',
-                              color: '#2563eb',
-                              fontWeight: 600,
-                              cursor: 'pointer',
-                              boxShadow:
-                                selectedEtudeIdx === idx
+                                borderRadius: 8,
+                                boxShadow: selected
                                   ? '0 2px 8px #2563eb22'
                                   : 'none',
-                            }}
-                            onClick={() => setSelectedEtudeIdx(idx)}
-                          >
-                            {etude.nomEtude ||
-                              etude.modePaiement ||
-                              `Étude ${idx + 1}`}
-                          </button>
-                        ))}
+                                cursor: 'pointer',
+                                padding: 12,
+                                marginBottom: 8,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                alignItems: 'flex-start',
+                                position: 'relative',
+                              }}
+                            >
+                              {/* Coche visuelle */}
+                              <div
+                                style={{
+                                  position: 'absolute',
+                                  top: 8,
+                                  right: 8,
+                                }}
+                              >
+                                {selected && (
+                                  <span
+                                    style={{ fontSize: 22, color: '#2563eb' }}
+                                  >
+                                    ✔️
+                                  </span>
+                                )}
+                              </div>
+                              <div
+                                style={{
+                                  fontWeight: 700,
+                                  color: '#2563eb',
+                                  marginBottom: 4,
+                                }}
+                              >
+                                {etude.nomEtude ||
+                                  etude.modePaiement ||
+                                  `Étude ${idx + 1}`}
+                              </div>
+                              <div style={{ fontSize: 14, marginBottom: 2 }}>
+                                <b>Puissance :</b>{' '}
+                                {etude.kit
+                                  ? String(etude.kit).split('-')[0]
+                                  : '-'}
+                              </div>
+                              <div style={{ fontSize: 14, marginBottom: 2 }}>
+                                <b>Stockage :</b>{' '}
+                                {etude.kit
+                                  ? String(etude.kit).split('-')[1] === '1'
+                                    ? '5KWh'
+                                    : String(etude.kit).split('-')[1] === '2'
+                                    ? '10KWh'
+                                    : '-'
+                                  : '-'}
+                              </div>
+                              <div style={{ fontSize: 14, marginBottom: 2 }}>
+                                <b>Production annuelle :</b>{' '}
+                                {etude.prodMoyenneKwh || '-'} kWh
+                              </div>
+                              <div style={{ fontSize: 14, marginBottom: 2 }}>
+                                <b>Rentabilité :</b>{' '}
+                                {etude.anneeRentable ||
+                                  etude.amortissement ||
+                                  '-'}
+                              </div>
+                              <div style={{ fontSize: 14, marginBottom: 2 }}>
+                                <b>Gain total 20 ans :</b>{' '}
+                                {etude.totalCumul
+                                  ? `${Number(
+                                      etude.totalCumul
+                                    ).toLocaleString()} €`
+                                  : '-'}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
                     </div>
                   );
                 }
                 return null;
               })()}
-              {/* Affichage résumé de l'étude sélectionnée */}
+              {/* Affichage résumé des études sélectionnées */}
               {(() => {
                 const client = clients.find((c) => c.id === selectedClient);
                 if (!client) return null;
@@ -1509,149 +1633,155 @@ const FaireProposition = () => {
                 } else if (client.etudePerso) {
                   etudes = [client.etudePerso];
                 }
-                const etude = etudes[selectedEtudeIdx] || etudes[0] || {};
-                const labels = {
-                  productionEstimee: "Production estimée à l'année",
-                  consoAnnuelle: "KWh consommés à l'année",
-                  primeEDF: 'Prime EDF',
-                  anneeRentabilite: 'Année de rentabilité',
-                  centraleAdapter: 'Centrale adaptée',
-                  puissanceCentrale: 'Puissance centrale',
-                  stockage: 'Stockage',
-                  surfaceToiture: 'Surface de toiture',
-                  consoPrix: 'Prix de la consommation',
-                  objectifAutonomie: 'Objectif autonomie',
-                  consoCouverte: 'Consommation couverte',
-                  economieEDF: 'Économie sur facture EDF',
-                  surplus: 'Surplus',
-                  reventeSurplus: 'Revente du surplus',
-                  gainAnnuel: 'Gain annuel',
-                  rentabilite: 'Taux de rentabilité annuel',
-                  amortissement: 'Durée d’amortissement',
-                  gainMensuel: 'Gain mensuel équivalent',
-                };
-                let autresDonnees = [];
-                // Extraction automatique puissance centrale et stockage depuis le champ kit
-                let puissanceCentrale = null;
-                let stockage = null;
-                if (etude.kit) {
-                  const kitMatch = String(etude.kit).match(/(\d+)KWh-(\d+)/);
-                  if (kitMatch) {
-                    puissanceCentrale = kitMatch[1] + 'KWh';
-                    stockage =
-                      kitMatch[2] === '1'
-                        ? '5KWh'
-                        : kitMatch[2] === '2'
-                        ? '10KWh'
-                        : '-';
-                  }
-                }
-                Object.entries(etude).forEach(([key, value]) => {
-                  if (
-                    !(
-                      Array.isArray(value) &&
-                      value.length > 0 &&
-                      typeof value[0] === 'object' &&
-                      value[0] !== null &&
-                      ('annee' in value[0] ||
-                        'coutEdf' in value[0] ||
-                        'mensualiteEdf' in value[0])
-                    )
-                  ) {
-                    if (key === 'puissanceCentrale' || key === 'stockage')
-                      return;
-                    autresDonnees.push(
-                      <li key={key} style={{ marginBottom: 6 }}>
-                        <span style={{ fontWeight: 500 }}>
-                          {labels[key] || key} :
-                        </span>{' '}
-                        {renderValue(value)}
-                      </li>
-                    );
-                  }
-                });
-                return (
-                  <ul style={{ paddingLeft: 0, listStyle: 'none' }}>
-                    <li>
-                      <b>Nom :</b> {client.nom} {client.prenom}
-                    </li>
-                    <li>
-                      <b>Email :</b> {client.email}
-                    </li>
-                    <li>
-                      <b>Téléphone :</b> {client.telephone}
-                    </li>
-                    <li>
-                      <b>Adresse :</b> {client.adresse} {client.ville}
-                    </li>
-                    <hr style={{ margin: '12px 0' }} />
-                    <div
+                const selectedEtudes =
+                  selectedEtudesIdx.length > 0
+                    ? selectedEtudesIdx.map((idx) => etudes[idx])
+                    : [etudes[0]];
+                return selectedEtudes.map((etude, i) => {
+                  if (!etude) return null;
+                  return (
+                    <ul
+                      key={i}
                       style={{
-                        fontWeight: 600,
-                        color: '#2563eb',
-                        marginBottom: 6,
+                        paddingLeft: 0,
+                        listStyle: 'none',
+                        marginBottom: 12,
                       }}
                     >
-                      Étude calculateur
-                    </div>
-                    {Object.keys(etude).length === 0 && (
-                      <div style={{ color: '#ef4444' }}>
-                        Aucune étude enregistrée pour ce client.
+                      <li>
+                        <b>Nom :</b> {client.nom} {client.prenom}
+                      </li>
+                      <li>
+                        <b>Email :</b> {client.email}
+                      </li>
+                      <li>
+                        <b>Téléphone :</b> {client.telephone}
+                      </li>
+                      <li>
+                        <b>Adresse :</b> {client.adresse} {client.ville}
+                      </li>
+                      <hr style={{ margin: '12px 0' }} />
+                      <div
+                        style={{
+                          fontWeight: 600,
+                          color: '#2563eb',
+                          marginBottom: 6,
+                        }}
+                      >
+                        Étude calculateur
                       </div>
-                    )}
-                    {puissanceCentrale && (
+                      {Object.keys(etude).length === 0 && (
+                        <div style={{ color: '#ef4444' }}>
+                          Aucune étude enregistrée pour ce client.
+                        </div>
+                      )}
                       <li>
                         <span style={{ fontWeight: 500 }}>
                           Puissance centrale :
                         </span>{' '}
-                        {puissanceCentrale}
+                        {etude.kit ? String(etude.kit).split('-')[0] : '-'}
                       </li>
-                    )}
-                    {stockage && (
                       <li>
                         <span style={{ fontWeight: 500 }}>Stockage :</span>{' '}
-                        {stockage}
+                        {etude.kit
+                          ? String(etude.kit).split('-')[1] === '1'
+                            ? '5KWh'
+                            : String(etude.kit).split('-')[1] === '2'
+                            ? '10KWh'
+                            : '-'
+                          : '-'}
                       </li>
-                    )}
-                    {autresDonnees}
-                  </ul>
-                );
+                      {/* ...autres données si besoin... */}
+                    </ul>
+                  );
+                });
               })()}
             </div>
           )}
         </div>
         <div style={{ flex: 1, minWidth: 320 }}>
-          {/* Tableau de rentabilité à droite */}
+          {/* Tableau de rentabilité à droite + graphiques pour chaque étude sélectionnée */}
           {selectedClient &&
             (() => {
               const client = clients.find((c) => c.id === selectedClient);
               if (!client) return null;
               let etudes = [];
               if (
-                client.Etude &&
-                Array.isArray(client.Etude) &&
-                client.Etude.length > 0
+                client.etudes &&
+                Array.isArray(client.etudes) &&
+                client.etudes.length > 0
               ) {
-                etudes = client.Etude;
+                etudes = client.etudes;
               } else if (client.etudePerso) {
                 etudes = [client.etudePerso];
               }
-              const etude = etudes[selectedEtudeIdx] || etudes[0] || {};
-              if (etude.tableauRentabiliteHtml) {
+              const selectedEtudes =
+                selectedEtudesIdx.length > 0
+                  ? selectedEtudesIdx.map((idx) => etudes[idx])
+                  : [etudes[0]];
+              return selectedEtudes.map((etude, i) => {
+                // Sécurisation de l'accès à rentabilite
+                const rentabiliteArr = Array.isArray(etude?.rentabilite)
+                  ? etude.rentabilite
+                  : [];
                 return (
-                  <div>
-                    <h4 style={{ color: '#2563eb', marginBottom: 8 }}>
-                      Tableau de rentabilité
-                    </h4>
-                    <div
-                      dangerouslySetInnerHTML={{
-                        __html: etude.tableauRentabiliteHtml,
-                      }}
-                    />
+                  <div key={i} style={{ marginBottom: 32 }}>
+                    {etude &&
+                    typeof etude.tableauRentabiliteHtml === 'string' &&
+                    etude.tableauRentabiliteHtml.length > 0 ? (
+                      <div>
+                        <h4 style={{ color: '#2563eb', marginBottom: 8 }}>
+                          Tableau de rentabilité
+                        </h4>
+                        <div
+                          dangerouslySetInnerHTML={{
+                            __html: etude.tableauRentabiliteHtml,
+                          }}
+                        />
+                      </div>
+                    ) : (
+                      <div style={{ color: '#ef4444', marginBottom: 8 }}>
+                        Pas de tableau de rentabilité pour cette étude.
+                      </div>
+                    )}
+                    {rentabiliteArr.length > 0 ? (
+                      <>
+                        <div id={`chartKwhRoi-${i}`}>
+                          <ChartKwhRoi
+                            ref={chartKwhRoiRef}
+                            rentabilite={rentabiliteArr}
+                            prixCentrale={etude.prixCentrale}
+                            prodMoyenneKwh={
+                              etude.prodMoyenneKwh || etude.prodMoyenne
+                            }
+                          />
+                        </div>
+                        <div id={`chartRentabiliteBar-${i}`} style={{ marginTop: 120 }}>
+                          <ChartRentabiliteBar
+                            ref={chartRentabiliteBarRef}
+                            rentabilite={rentabiliteArr}
+                          />
+                        </div>
+                        <div id={`chartBreakEven-${i}`} style={{ marginTop: 120 }}>
+                          <ChartBreakEven
+                            ref={chartBreakEvenRef}
+                            rentabilite={rentabiliteArr}
+                            prixCentrale={etude.prixCentrale}
+                            prime={etude.prime}
+                          />
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ color: '#ef4444', marginBottom: 8 }}>
+                        Erreur : cette étude n’a pas de données de rentabilité ou le format est incorrect.<br />
+                        <span style={{ fontSize: 13, color: '#b91c1c' }}>
+                          (Vérifiez que la propriété <b>rentabilite</b> existe et est un tableau)
+                        </span>
+                      </div>
+                    )}
                   </div>
                 );
-              }
-              return null;
+              });
             })()}
         </div>
       </div>
