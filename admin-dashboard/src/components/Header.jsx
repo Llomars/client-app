@@ -1,4 +1,3 @@
-
 // components/Header.jsx
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import { useEffect, useState } from 'react';
@@ -93,7 +92,9 @@ export default function Header() {
               gap: '8px',
             }}
           >
-            <span role="img" aria-label="clients" style={{ fontSize: 20 }}>👥</span>
+            <span role="img" aria-label="clients" style={{ fontSize: 20 }}>
+              👥
+            </span>
             Mes clients
           </Link>
 
@@ -190,7 +191,13 @@ export default function Header() {
                   gap: '8px',
                 }}
               >
-                <span role="img" aria-label="clients chauds" style={{ fontSize: 20 }}>🔥</span>
+                <span
+                  role="img"
+                  aria-label="clients chauds"
+                  style={{ fontSize: 20 }}
+                >
+                  🔥
+                </span>
                 Clients chauds
               </Link>
             </>
@@ -210,26 +217,32 @@ export default function Header() {
               position: 'relative',
             }}
           >
-            <span role="img" aria-label="relances" style={{ fontSize: 20 }}>⏰</span>
+            <span role="img" aria-label="relances" style={{ fontSize: 20 }}>
+              ⏰
+            </span>
             Relances
             {relancesJourCount > 0 && (
-              <span style={{
-                position: 'absolute',
-                top: -6,
-                right: -6,
-                background: '#ef4444',
-                color: '#fff',
-                borderRadius: '50%',
-                minWidth: 22,
-                height: 22,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontWeight: 700,
-                fontSize: 14,
-                boxShadow: '0 2px 8px #ef444488',
-                zIndex: 2
-              }}>{relancesJourCount}</span>
+              <span
+                style={{
+                  position: 'absolute',
+                  top: -6,
+                  right: -6,
+                  background: '#ef4444',
+                  color: '#fff',
+                  borderRadius: '50%',
+                  minWidth: 22,
+                  height: 22,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontWeight: 700,
+                  fontSize: 14,
+                  boxShadow: '0 2px 8px #ef444488',
+                  zIndex: 2,
+                }}
+              >
+                {relancesJourCount}
+              </span>
             )}
           </Link>
 
@@ -247,7 +260,9 @@ export default function Header() {
               gap: '8px',
             }}
           >
-            <span role="img" aria-label="proposition" style={{ fontSize: 20 }}>💼</span>
+            <span role="img" aria-label="proposition" style={{ fontSize: 20 }}>
+              💼
+            </span>
             Faire une proposition
           </Link>
 
@@ -265,7 +280,9 @@ export default function Header() {
               gap: '8px',
             }}
           >
-            <span role="img" aria-label="recap" style={{ fontSize: 20 }}>📁</span>
+            <span role="img" aria-label="recap" style={{ fontSize: 20 }}>
+              📁
+            </span>
             Récap projet client
           </Link>
 
@@ -293,7 +310,10 @@ export default function Header() {
               marginLeft: '10px',
             }}
           >
-            {user.email} <span style={{color:'#f59e0b',marginLeft:6}}>(role: {role || 'aucun'})</span>
+            {user.email}{' '}
+            <span style={{ color: '#f59e0b', marginLeft: 6 }}>
+              (role: {role || 'aucun'})
+            </span>
           </span>
         </div>
       ) : (

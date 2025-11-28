@@ -8,6 +8,7 @@ import {
   query,
   updateDoc,
   where,
+  arrayUnion,
 } from 'firebase/firestore';
 import { jsPDF } from 'jspdf';
 import L from 'leaflet';
@@ -16,6 +17,31 @@ import { useEffect, useState } from 'react';
 import { MapContainer, Marker, TileLayer, useMapEvent } from 'react-leaflet';
 import { useNavigate } from 'react-router-dom';
 import { db } from '../firebaseConfig';
+// import { doc, updateDoc, arrayUnion } from 'firebase/firestore'; // doublon supprimé
+// Fonction pour enregistrer une étude dans le client Firestore
+const enregistrerEtudeClient = async (clientId, etudeData) => {
+  if (!clientId || !etudeData) return;
+  try {
+    const clientDocRef = doc(db, 'clients', clientId);
+    // Ajout des deux commerciaux si présents dans etudeData
+    const updateFields = {
+      etudes: arrayUnion({
+        ...etudeData,
+        date: new Date().toISOString(),
+      }),
+    };
+    if (etudeData.emailCommercial) {
+      updateFields.emailCommercial = etudeData.emailCommercial;
+    }
+    if (etudeData.emailCommercialAcco) {
+      updateFields.emailCommercialAcco = etudeData.emailCommercialAcco;
+    }
+    await updateDoc(clientDocRef, updateFields);
+    alert('Étude enregistrée pour le client !');
+  } catch (e) {
+    alert('Erreur lors de l’enregistrement de l’étude pour le client');
+  }
+};
 
 // db est importé depuis firebaseConfig.js (déjà initialisé)
 
@@ -24,6 +50,8 @@ function Calculateur() {
   const PARAMS_DOC_ID = 'calculateur_params';
   const [loadingParams, setLoadingParams] = useState(true);
   // ...existing code...
+  // Exemple d'utilisation :
+  // enregistrerEtudeClient(selectedClient.id, { kit: kit, simulation: resultat, prix: prix, ...autresInfos })
   // Champs admin pour prime et tarif de rachat
   // Champs admin pour prime par puissance
   const [prime3Admin, setPrime3Admin] = useState(null);
@@ -1586,8 +1614,7 @@ function Calculateur() {
         coutEdf: Number(coutEdf),
         coutCentrale: Number(coutCentrale),
         prixEdfCts: (prixEdf * 100).toFixed(1),
-        reventeEstimee:
-          gainRevente !== '' ? Number(gainRevente) : 0,
+        reventeEstimee: gainRevente !== '' ? Number(gainRevente) : 0,
         diff: Number(coutEdf) - Number(coutCentrale),
         mensualiteEdf,
         mensualiteCentrale,
@@ -2420,7 +2447,15 @@ function Calculateur() {
                     if (col.key === 'reventeEstimee') {
                       html += `<td colspan='1' style='border:1.5px solid #ffe58f;padding:8px 12px;font-size:17px;font-weight:900;color:#bfa100;text-align:center;'>Cumul revente sur 20 ans : ${cumulRevente.toLocaleString()} €</td>`;
                     } else if (idx === columns.length - 1) {
-                      html += `<td style='border:1.5px solid #ffe58f;padding:8px 12px;font-size:17px;font-weight:900;color:#0e7490;text-align:center;'>Total économies + revente : ${(rentabilite.reduce((sum, row) => sum + ((Number(row.diff) || 0) + (Number(row.reventeEstimee) || 0)), 0)).toLocaleString()} €</td>`;
+                      html += `<td style='border:1.5px solid #ffe58f;padding:8px 12px;font-size:17px;font-weight:900;color:#0e7490;text-align:center;'>Total économies + revente : ${rentabilite
+                        .reduce(
+                          (sum, row) =>
+                            sum +
+                            ((Number(row.diff) || 0) +
+                              (Number(row.reventeEstimee) || 0)),
+                          0
+                        )
+                        .toLocaleString()} €</td>`;
                     } else {
                       html += `<td></td>`;
                     }
@@ -2484,10 +2519,21 @@ function Calculateur() {
                   prime,
                   gainRevente,
                   eco,
-                  rentabilite,
-                  tableauRentabilite: rentabilite, // Tableau brut
+                  // Ajout des propriétés manquantes pour compatibilité
+                  puissance: (() => {
+                    const kitParts = kit ? kit.split(' ') : [];
+                    if (kitParts.length > 0) {
+                      const puissanceStr = kitParts[0].replace('KWh', '');
+                      return parseInt(puissanceStr, 10) || null;
+                    }
+                    return null;
+                  })(),
+                  capaciteBatterie,
+                  stockage: capaciteBatterie || null,
+                  rentabilite: Array.isArray(rentabilite) ? rentabilite : [],
+                  tableauRentabilite: Array.isArray(rentabilite) ? rentabilite : [], // Tableau brut
                   tableauRentabiliteHtml:
-                    getTableauRentabiliteHtml(rentabilite), // Tableau HTML complet
+                    getTableauRentabiliteHtml(Array.isArray(rentabilite) ? rentabilite : []), // Tableau HTML complet
                   totalDiff,
                   nbAnneesRentable,
                   anneeRentable: anneeRentable?.annee || null,
@@ -2496,23 +2542,7 @@ function Calculateur() {
                   totalCumulTableau: totalCumul,
                 };
                 try {
-                  const ref = doc(db, 'clients', selectedClient.id);
-                  // Récupérer les études existantes
-                  const snap = await getDocs(
-                    query(
-                      collection(db, 'clients'),
-                      where('id', '==', selectedClient.id)
-                    )
-                  );
-                  let etudes = [];
-                  if (
-                    snap.docs.length > 0 &&
-                    Array.isArray(snap.docs[0].data().Etude)
-                  ) {
-                    etudes = snap.docs[0].data().Etude;
-                  }
-                  etudes.push(etude);
-                  await updateDoc(ref, { Etude: etudes });
+                  await enregistrerEtudeClient(selectedClient.id, etude);
                   setAssignStatus('Étude assignée au client !');
                 } catch (e) {
                   setAssignStatus("Erreur lors de l'enregistrement.");
@@ -3905,11 +3935,17 @@ function Calculateur() {
                           <td
                             style={{
                               padding: 8,
-                              color: typeof diff === 'number' && diff < 0 ? '#dc2626' : '#10b981',
+                              color:
+                                typeof diff === 'number' && diff < 0
+                                  ? '#dc2626'
+                                  : '#10b981',
                               fontWeight: 700,
                             }}
                           >
-                            {typeof diff === 'number' && !isNaN(diff) ? diff.toFixed(2) : '-'} €
+                            {typeof diff === 'number' && !isNaN(diff)
+                              ? diff.toFixed(2)
+                              : '-'}{' '}
+                            €
                           </td>
                         </tr>
                       );
@@ -3931,7 +3967,9 @@ function Calculateur() {
                   <tr style={{ background: '#fef9c3', fontWeight: 900 }}>
                     <td style={{ padding: 8 }}>Total 20 ans</td>
                     {/* Total coût EDF */}
-                    <td style={{ padding: 8, color: '#dc2626', fontWeight: 900 }}>
+                    <td
+                      style={{ padding: 8, color: '#dc2626', fontWeight: 900 }}
+                    >
                       {rentabilite
                         .reduce((acc, row) => acc + (row.coutEdf || 0), 0)
                         .toLocaleString()}{' '}
@@ -3939,53 +3977,148 @@ function Calculateur() {
                     </td>
                     <td style={{ padding: 8 }}>-</td>
                     {/* Total retour sur investissement sur 20 ans (valeur finale en 2045) */}
-                    <td style={{ padding: 8, color: '#10b981', fontWeight: 900 }}>
-                      {paiementComptant && (() => {
-                        let lastSolde = null;
-                        let prixEdfBase = 0.25;
-                        let consoReelle = conso ? Number(conso) : 0;
-                        let solde = prixNet;
-                        for (let i = 0; i < rentabilite.length; i++) {
-                          let prixEdfAnnee = modeAugmentation
-                            ? prixEdfBase * Math.pow(1.05, i)
-                            : prixEdfBase;
-                          let economieEDF = Math.min(prodMoyenneKwh, consoReelle) * prixEdfAnnee;
-                          let primeAnnee = i === 1 ? prime : 0;
-                          let revente = rentabilite[i].reventeEstimee || 0;
-                          let residuelEDFAn = consoNuitJour > capaciteBatterie ? (consoNuitJour - capaciteBatterie) * 365 : 0;
-                          let coutResiduelEDF = residuelEDFAn * prixEdfAnnee;
-                          solde -= economieEDF + primeAnnee + revente - coutResiduelEDF;
-                          lastSolde = solde;
-                        }
-                        return lastSolde !== null ? lastSolde.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }).replace('-', '') + ' €' : '-';
-                      })()}
+                    <td
+                      style={{ padding: 8, color: '#10b981', fontWeight: 900 }}
+                    >
+                      {paiementComptant &&
+                        (() => {
+                          let lastSolde = null;
+                          let prixEdfBase = 0.25;
+                          let consoReelle = conso ? Number(conso) : 0;
+                          let solde = prixNet;
+                          for (let i = 0; i < rentabilite.length; i++) {
+                            let prixEdfAnnee = modeAugmentation
+                              ? prixEdfBase * Math.pow(1.05, i)
+                              : prixEdfBase;
+                            let economieEDF =
+                              Math.min(prodMoyenneKwh, consoReelle) *
+                              prixEdfAnnee;
+                            let primeAnnee = i === 1 ? prime : 0;
+                            let revente = rentabilite[i].reventeEstimee || 0;
+                            let residuelEDFAn =
+                              consoNuitJour > capaciteBatterie
+                                ? (consoNuitJour - capaciteBatterie) * 365
+                                : 0;
+                            let coutResiduelEDF = residuelEDFAn * prixEdfAnnee;
+                            solde -=
+                              economieEDF +
+                              primeAnnee +
+                              revente -
+                              coutResiduelEDF;
+                            lastSolde = solde;
+                          }
+                          return lastSolde !== null
+                            ? lastSolde
+                                .toLocaleString(undefined, {
+                                  minimumFractionDigits: 0,
+                                  maximumFractionDigits: 0,
+                                })
+                                .replace('-', '') + ' €'
+                            : '-';
+                        })()}
                     </td>
                     {/* Cumul économies seul = coût total EDF - coût total centrale */}
-                    <td style={{ padding: 8, color: '#10b981', fontWeight: 900, textAlign: 'center' }}>
+                    <td
+                      style={{
+                        padding: 8,
+                        color: '#10b981',
+                        fontWeight: 900,
+                        textAlign: 'center',
+                      }}
+                    >
                       {(() => {
-                        const totalEdf = rentabilite.reduce((acc, row) => acc + (row.coutEdf || 0), 0);
-                        const totalCentrale = rentabilite.reduce((acc, row) => acc + (row.coutCentrale || 0), 0);
+                        const totalEdf = rentabilite.reduce(
+                          (acc, row) => acc + (row.coutEdf || 0),
+                          0
+                        );
+                        const totalCentrale = rentabilite.reduce(
+                          (acc, row) => acc + (row.coutCentrale || 0),
+                          0
+                        );
                         const economies = totalEdf - totalCentrale;
-                        return economies.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' €';
+                        return (
+                          economies.toLocaleString(undefined, {
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 0,
+                          }) + ' €'
+                        );
                       })()}
-                      <div style={{ fontSize: 13, color: '#10b981', fontWeight: 700 }}>Cumul économies 20 ans</div>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: '#10b981',
+                          fontWeight: 700,
+                        }}
+                      >
+                        Cumul économies 20 ans
+                      </div>
                     </td>
                     {/* Cumul revente sur 20 ans */}
-                    <td style={{ padding: 8, color: '#bfa100', fontWeight: 900, textAlign: 'center' }}>
-                      {rentabilite.reduce((acc, row) => acc + (Number(row.reventeEstimee) || 0), 0).toLocaleString()} €
-                      <div style={{ fontSize: 13, color: '#bfa100', fontWeight: 700 }}>Cumul revente 20 ans</div>
+                    <td
+                      style={{
+                        padding: 8,
+                        color: '#bfa100',
+                        fontWeight: 900,
+                        textAlign: 'center',
+                      }}
+                    >
+                      {rentabilite
+                        .reduce(
+                          (acc, row) => acc + (Number(row.reventeEstimee) || 0),
+                          0
+                        )
+                        .toLocaleString()}{' '}
+                      €
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: '#bfa100',
+                          fontWeight: 700,
+                        }}
+                      >
+                        Cumul revente 20 ans
+                      </div>
                     </td>
                     {/* Total économies EDF + Gains (tout en bas à droite) */}
-                    <td style={{ padding: 8, color: '#0e7490', fontWeight: 900, textAlign: 'center' }}>
+                    <td
+                      style={{
+                        padding: 8,
+                        color: '#0e7490',
+                        fontWeight: 900,
+                        textAlign: 'center',
+                      }}
+                    >
                       {(() => {
-                        const totalEdf = rentabilite.reduce((acc, row) => acc + (row.coutEdf || 0), 0);
-                        const totalCentrale = rentabilite.reduce((acc, row) => acc + (row.coutCentrale || 0), 0);
+                        const totalEdf = rentabilite.reduce(
+                          (acc, row) => acc + (row.coutEdf || 0),
+                          0
+                        );
+                        const totalCentrale = rentabilite.reduce(
+                          (acc, row) => acc + (row.coutCentrale || 0),
+                          0
+                        );
                         const economies = totalEdf - totalCentrale;
-                        const revente = rentabilite.reduce((acc, row) => acc + (Number(row.reventeEstimee) || 0), 0);
+                        const revente = rentabilite.reduce(
+                          (acc, row) => acc + (Number(row.reventeEstimee) || 0),
+                          0
+                        );
                         const total = economies + revente;
-                        return total.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 }) + ' €';
+                        return (
+                          total.toLocaleString(undefined, {
+                            minimumFractionDigits: 0,
+                            maximumFractionDigits: 0,
+                          }) + ' €'
+                        );
                       })()}
-                      <div style={{ fontSize: 13, color: '#0e7490', fontWeight: 700 }}>Total économies + revente</div>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: '#0e7490',
+                          fontWeight: 700,
+                        }}
+                      >
+                        Total économies + revente
+                      </div>
                     </td>
                   </tr>
                 </tfoot>
@@ -4130,10 +4263,7 @@ function Calculateur() {
                 >
                   Banque
                 </label>
-                <select
-                  value={banque}
-                  onChange={handleBanqueChange}
-                >
+                <select value={banque} onChange={handleBanqueChange}>
                   {banques.map((bk) => (
                     <option key={bk.nom} value={bk.nom}>
                       {bk.nom}

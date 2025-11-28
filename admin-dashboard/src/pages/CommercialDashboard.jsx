@@ -27,15 +27,31 @@ export default function CommercialDashboard() {
   const now = new Date();
   const currentMonth = now.getMonth() + 1;
   const currentYear = now.getFullYear();
-  // Filtre les clients du commercial connecté
-  const myClients = user ? clients.filter(c => c.emailCommercial === user.email) : [];
+  // Filtre les clients du commercial connecté (inclut ventes partagées)
+  const myClients = user ? clients.filter(c => {
+    return (
+      c.emailCommercial === user.email ||
+      c.emailCommercialAcco === user.email ||
+      c.emailCom === user.email
+    );
+  }) : [];
+
+  // Ventes du mois (inclut ventes partagées)
   const ventesMois = myClients.filter(c => {
     if (!c.statut || (c.statut !== 'Vendu' && c.statut !== 'Signé')) return false;
     if (!c.dateVente) return false;
     const d = new Date(c.dateVente);
     return d.getMonth() + 1 === currentMonth && d.getFullYear() === currentYear;
   });
-  const caMois = ventesMois.reduce((sum, c) => sum + (parseFloat(c.prixCentrale) || 0), 0);
+
+  // CA du mois (divisé par 2 si vente partagée)
+  const caMois = ventesMois.reduce((sum, c) => {
+    if (c.emailCommercial && c.emailCommercialAcco &&
+      (c.emailCommercial === user.email || c.emailCommercialAcco === user.email)) {
+      return sum + ((parseFloat(c.prixCentrale) || 0) / 2);
+    }
+    return sum + (parseFloat(c.prixCentrale) || 0);
+  }, 0);
   const nbVentesMois = ventesMois.length;
   const commission = 0.04; // 4%
   const totalCommission = caMois * commission;
@@ -159,7 +175,8 @@ export default function CommercialDashboard() {
                 <ul>
                   {myClients.map(c => (
                     <li key={c.id}>
-                      <b>{c.nom} {c.prenom}</b> | Statut: {c.statut} | Prix: {c.prixCentrale} | Date vente: {c.dateVente || '-'}
+                      <b>{c.nom} {c.prenom}</b> | Statut: {c.statut} | Prix: {c.prixCentrale} | Date vente: {c.dateVente || '-'}<br />
+                      <span style={{color:'#64748b'}}>emailCommercial: <b>{c.emailCommercial || '-'}</b> | emailCommercialAcco: <b>{c.emailCommercialAcco || '-'}</b> | emailCom: <b>{c.emailCom || '-'}</b></span>
                     </li>
                   ))}
                 </ul>
@@ -278,14 +295,24 @@ function PerformanceSection({ clients, commerciaux }) {
 
   // Stats du mois sélectionné
   const statsMois = allCommerciaux.map(com => {
-    const commClients = allClients.filter(c => c.emailCommercial === com.email || c.emailCom === com.email);
-    const caMois = commClients.reduce((sum, c) => {
+    // Pour chaque commercial, on parcourt tous les clients vendus du mois
+    let caMois = 0;
+    allClients.forEach(c => {
       const d = c.dateVente ? new Date(c.dateVente) : null;
       if (d && d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear && (c.statut === 'Vendu' || c.statut === 'Signé')) {
-        return sum + (parseFloat(c.prixCentrale) || 0);
+        // Vente partagée : les deux commerciaux sont présents
+        if (c.emailCommercial && c.emailCommercialAcco) {
+          if (c.emailCommercial === com.email || c.emailCommercialAcco === com.email) {
+            caMois += (parseFloat(c.prixCentrale) || 0) / 2;
+          }
+        } else {
+          // Vente non partagée : commercial principal ou emailCom
+          if (c.emailCommercial === com.email || c.emailCom === com.email) {
+            caMois += (parseFloat(c.prixCentrale) || 0);
+          }
+        }
       }
-      return sum;
-    }, 0);
+    });
     // Toujours utiliser le nom/prénom/email réel
     const displayName = com.nom && com.prenom ? `${com.nom} ${com.prenom}` : (com.nom || com.prenom || com.email);
     return {
@@ -300,15 +327,21 @@ function PerformanceSection({ clients, commerciaux }) {
 
   // Stats cumul annuel
   const statsAnnuel = allCommerciaux.map(com => {
-    const commClients = allClients.filter(c => c.emailCommercial === com.email || c.emailCom === com.email);
-    const caAnnee = commClients.reduce((sum, c) => {
+    let caAnnee = 0;
+    allClients.forEach(c => {
       const d = c.dateVente ? new Date(c.dateVente) : null;
       if (d && d.getFullYear() === selectedYear && (c.statut === 'Vendu' || c.statut === 'Signé')) {
-        return sum + (parseFloat(c.prixCentrale) || 0);
+        if (c.emailCommercial && c.emailCommercialAcco) {
+          if (c.emailCommercial === com.email || c.emailCommercialAcco === com.email) {
+            caAnnee += (parseFloat(c.prixCentrale) || 0) / 2;
+          }
+        } else {
+          if (c.emailCommercial === com.email || c.emailCom === com.email) {
+            caAnnee += (parseFloat(c.prixCentrale) || 0);
+          }
+        }
       }
-      return sum;
-    }, 0);
-    // Toujours utiliser le nom/prénom/email réel
+    });
     const displayName = com.nom && com.prenom ? `${com.nom} ${com.prenom}` : (com.nom || com.prenom || com.email);
     return {
       ...com,

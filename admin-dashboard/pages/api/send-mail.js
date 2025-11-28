@@ -14,19 +14,23 @@ export default async function handler(req, res) {
       secure: true,
       auth: {
         user: smtpUser,
-        pass: smtpPass
-      }
+        pass: smtpPass,
+      },
     });
     const mailOptions = {
       from: from || smtpUser,
       to,
       subject,
       html,
-      attachments: pdfBase64 ? [{
-        filename: 'devis.pdf',
-        content: pdfBase64.split('base64,')[1],
-        encoding: 'base64'
-      }] : []
+      attachments: pdfBase64
+        ? [
+            {
+              filename: 'devis.pdf',
+              content: pdfBase64.split('base64,')[1],
+              encoding: 'base64',
+            },
+          ]
+        : [],
     };
     await userTransporter.sendMail(mailOptions);
     res.status(200).json({ success: true });

@@ -1,4 +1,3 @@
-
 import { onAuthStateChanged } from 'firebase/auth';
 import {
   addDoc,
@@ -9,6 +8,7 @@ import {
   query,
   updateDoc,
   where,
+  arrayRemove,
 } from 'firebase/firestore';
 import { getDownloadURL, getStorage, ref, uploadBytes } from 'firebase/storage';
 import React, { useEffect, useState } from 'react';
@@ -1456,7 +1456,7 @@ export default function MesClients() {
           type="text"
           placeholder="Filtrer par nom..."
           value={filtreNomClient}
-          onChange={e => setFiltreNomClient(e.target.value)}
+          onChange={(e) => setFiltreNomClient(e.target.value)}
           style={{
             marginLeft: 16,
             padding: '6px 12px',
@@ -1515,8 +1515,7 @@ export default function MesClients() {
             const prenom = (client.prenom || '').toLowerCase();
             const search = filtreNomClient.trim().toLowerCase();
             return nom.includes(search) || prenom.includes(search);
-          })
-          .length === 0 && (
+          }).length === 0 && (
           <li style={{ color: '#ef4444', fontWeight: 600 }}>
             Aucun client attribué.
             <br />
@@ -1884,117 +1883,176 @@ export default function MesClients() {
                         ({client.accoUserId})
                       </div>
                     )}
-                    {/* Affichage des études associées au client */}
-                    {Array.isArray(client.Etude) && client.Etude.length > 0 && (
-                      <div
-                        style={{
-                          background: '#e0f2fe',
-                          borderRadius: 8,
-                          padding: 12,
-                          marginTop: 10,
-                        }}
-                      >
-                        <h4 style={{ marginBottom: 8 }}>Études assignées</h4>
-                        {client.Etude.map((etude, idx) => (
-                          <div
-                            key={idx}
-                            style={{
-                              marginBottom: 12,
-                              padding: 10,
-                              background: '#fff',
-                              borderRadius: 6,
-                              boxShadow: '0 2px 8px #2563eb22',
-                            }}
-                          >
+                    {/* Affichage des études associées au client (champ 'etudes') */}
+                    {Array.isArray(client.etudes) &&
+                      client.etudes.length > 0 && (
+                        <div
+                          style={{
+                            background: '#e0f2fe',
+                            borderRadius: 8,
+                            padding: 12,
+                            marginTop: 10,
+                          }}
+                        >
+                          <h4 style={{ marginBottom: 8 }}>Études assignées</h4>
+                          {client.etudes.map((etude, idx) => (
                             <div
+                              key={idx}
                               style={{
-                                fontWeight: 600,
-                                color: '#2563eb',
-                                marginBottom: 4,
+                                marginBottom: 12,
+                                padding: 10,
+                                background: '#fff',
+                                borderRadius: 6,
+                                boxShadow: '0 2px 8px #2563eb22',
+                                position: 'relative',
                               }}
                             >
-                              Étude du{' '}
-                              {new Date(etude.date).toLocaleDateString('fr-FR')}
-                            </div>
-                            <div>
-                              Production estimée à l'année :{' '}
-                              <b>{etude.prodMoyenneKwh} kWh</b>
-                            </div>
-                            <div>
-                              KWh consommés à l'année : <b>{etude.conso} kWh</b>
-                            </div>
-                            <div>
-                              Prime EDF : <b>{etude.prime} €</b>
-                            </div>
-                            <div>
-                              Année de rentabilité :{' '}
-                              <b>
-                                {etude.anneeRentable ||
-                                  etude.nbAnneesRentable ||
-                                  '-'}
-                              </b>
-                            </div>
-                            {/* Tableau de rentabilité si dispo */}
-                            {etude.renta && Array.isArray(etude.renta) && (
-                              <div style={{ marginTop: 8 }}>
-                                <b>Tableau de rentabilité :</b>
-                                <table
-                                  style={{
-                                    width: '100%',
-                                    marginTop: 4,
-                                    borderCollapse: 'collapse',
-                                    fontSize: 14,
-                                  }}
-                                >
-                                  <thead>
-                                    <tr style={{ background: '#e0e7ff' }}>
-                                      <th
-                                        style={{
-                                          padding: 4,
-                                          border: '1px solid #c7d2fe',
-                                        }}
-                                      >
-                                        Année
-                                      </th>
-                                      <th
-                                        style={{
-                                          padding: 4,
-                                          border: '1px solid #c7d2fe',
-                                        }}
-                                      >
-                                        Gain
-                                      </th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {etude.renta.map((row, i) => (
-                                      <tr key={i}>
-                                        <td
-                                          style={{
-                                            padding: 4,
-                                            border: '1px solid #c7d2fe',
-                                          }}
-                                        >
-                                          {row.annee}
-                                        </td>
-                                        <td
-                                          style={{
-                                            padding: 4,
-                                            border: '1px solid #c7d2fe',
-                                          }}
-                                        >
-                                          {row.gain} €
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
+                              <div
+                                style={{
+                                  fontWeight: 600,
+                                  color: '#2563eb',
+                                  marginBottom: 4,
+                                }}
+                              >
+                                Étude du{' '}
+                                {etude.date
+                                  ? new Date(etude.date).toLocaleDateString(
+                                      'fr-FR'
+                                    )
+                                  : '-'}
                               </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
+                              <div>
+                                Production estimée à l'année :{' '}
+                                <b>{etude.prodMoyenneKwh} kWh</b>
+                              </div>
+                              <div>
+                                KWh consommés à l'année :{' '}
+                                <b>{etude.conso} kWh</b>
+                              </div>
+                              <div>
+                                Prime EDF : <b>{etude.prime} €</b>
+                              </div>
+                              <div>
+                                Année de rentabilité :{' '}
+                                <b>
+                                  {etude.anneeRentable ||
+                                    etude.nbAnneesRentable ||
+                                    '-'}
+                                </b>
+                              </div>
+                              {/* Tableau de rentabilité si dispo */}
+                              {etude.renta && Array.isArray(etude.renta) && (
+                                <div style={{ marginTop: 8 }}>
+                                  <b>Tableau de rentabilité :</b>
+                                  <table
+                                    style={{
+                                      width: '100%',
+                                      marginTop: 4,
+                                      borderCollapse: 'collapse',
+                                      fontSize: 14,
+                                    }}
+                                  >
+                                    <thead>
+                                      <tr style={{ background: '#e0e7ff' }}>
+                                        <th
+                                          style={{
+                                            padding: 4,
+                                            border: '1px solid #c7d2fe',
+                                          }}
+                                        >
+                                          Année
+                                        </th>
+                                        <th
+                                          style={{
+                                            padding: 4,
+                                            border: '1px solid #c7d2fe',
+                                          }}
+                                        >
+                                          Gain
+                                        </th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {etude.renta.map((row, i) => (
+                                        <tr key={i}>
+                                          <td
+                                            style={{
+                                              padding: 4,
+                                              border: '1px solid #c7d2fe',
+                                            }}
+                                          >
+                                            {row.annee}
+                                          </td>
+                                          <td
+                                            style={{
+                                              padding: 4,
+                                              border: '1px solid #c7d2fe',
+                                            }}
+                                          >
+                                            {row.gain} €
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                              {/* Bouton de suppression d'étude */}
+                              <button
+                                style={{
+                                  position: 'absolute',
+                                  top: 10,
+                                  right: 10,
+                                  background: '#ef4444',
+                                  color: '#fff',
+                                  border: 'none',
+                                  borderRadius: 6,
+                                  fontWeight: 600,
+                                  fontSize: 14,
+                                  padding: '4px 10px',
+                                  cursor: 'pointer',
+                                }}
+                                onClick={async () => {
+                                  if (
+                                    !window.confirm('Supprimer cette étude ?')
+                                  )
+                                    return;
+                                  try {
+                                    // Firestore arrayRemove
+                                    await updateDoc(
+                                      doc(db, 'clients', client.id),
+                                      {
+                                        etudes: arrayRemove(etude),
+                                      }
+                                    );
+                                    // Mise à jour locale
+                                    setClients((prev) =>
+                                      prev.map((c) =>
+                                        c.id === client.id
+                                          ? {
+                                              ...c,
+                                              etudes: c.etudes.filter(
+                                                (e, i) => i !== idx
+                                              ),
+                                            }
+                                          : c
+                                      )
+                                    );
+                                    alert('Étude supprimée.');
+                                  } catch (err) {
+                                    alert(
+                                      'Erreur lors de la suppression de l’étude'
+                                    );
+                                    console.error(err);
+                                  }
+                                }}
+                              >
+                                Supprimer
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     {dernierEtat ? (
                       <div
                         style={{
