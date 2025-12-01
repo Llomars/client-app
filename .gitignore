@@ -7,6 +7,7 @@ dist/
 *.log
 .firebase/
 serviceAccountKey.json
+Newkey.json
 
 # Expo
 .expo/

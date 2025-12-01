@@ -58,15 +58,26 @@ export default function MesClients() {
   const handleSetAcco = async (clientId, accoUserId) => {
     if (!accoUserId) return;
     try {
-      // Met à jour le client dans Firestore pour ajouter l'accompagnant
+      // Récupère l'email de l'accompagnant depuis la liste des utilisateurs CRM
+      const accoUser = crmUsers.find((u) => u.id === accoUserId);
+      const accoEmail = accoUser ? accoUser.email : '';
+      // Met à jour le client dans Firestore pour ajouter l'accompagnant et son email
       await updateDoc(doc(db, 'clients', clientId), {
         accoUserId,
         accoActive: true,
+        emailCommercialAcco: accoEmail,
       });
       // Met à jour localement la fiche client pour affichage immédiat
       setClients(
         clients.map((c) =>
-          c.id === clientId ? { ...c, accoUserId, accoActive: true } : c
+          c.id === clientId
+            ? {
+                ...c,
+                accoUserId,
+                accoActive: true,
+                emailCommercialAcco: accoEmail,
+              }
+            : c
         )
       );
       // Affiche une confirmation

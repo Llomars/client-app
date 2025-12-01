@@ -72,14 +72,19 @@ export default function CommercialDashboard() {
         ventes: 0
       });
     }
-    // Remplit CA et ventes pour chaque mois
+    // Remplit CA et ventes pour chaque mois (CA partagé si vente acco)
     myClients.forEach(c => {
       if (!c.statut || (c.statut !== 'Vendu' && c.statut !== 'Signé')) return;
       if (!c.dateVente) return;
       const d = new Date(c.dateVente);
       const idx = arr.findIndex(m => m.month === d.getMonth() + 1 && m.year === d.getFullYear());
       if (idx !== -1) {
-        arr[idx].CA += parseFloat(c.prixCentrale) || 0;
+        let caValue = parseFloat(c.prixCentrale) || 0;
+        if (c.emailCommercial && c.emailCommercialAcco &&
+          (c.emailCommercial === user.email || c.emailCommercialAcco === user.email)) {
+          caValue = caValue / 2;
+        }
+        arr[idx].CA += caValue;
         arr[idx].ventes += 1;
       }
     });
@@ -297,28 +302,41 @@ function PerformanceSection({ clients, commerciaux }) {
   const statsMois = allCommerciaux.map(com => {
     // Pour chaque commercial, on parcourt tous les clients vendus du mois
     let caMois = 0;
+    const debugClients = [];
     allClients.forEach(c => {
       const d = c.dateVente ? new Date(c.dateVente) : null;
       if (d && d.getMonth() + 1 === selectedMonth && d.getFullYear() === selectedYear && (c.statut === 'Vendu' || c.statut === 'Signé')) {
-        // Vente partagée : les deux commerciaux sont présents
+        let caAttribue = 0;
         if (c.emailCommercial && c.emailCommercialAcco) {
           if (c.emailCommercial === com.email || c.emailCommercialAcco === com.email) {
-            caMois += (parseFloat(c.prixCentrale) || 0) / 2;
+            caAttribue = (parseFloat(c.prixCentrale) || 0) / 2;
           }
         } else {
-          // Vente non partagée : commercial principal ou emailCom
           if (c.emailCommercial === com.email || c.emailCom === com.email) {
-            caMois += (parseFloat(c.prixCentrale) || 0);
+            caAttribue = (parseFloat(c.prixCentrale) || 0);
           }
+        }
+        if (caAttribue > 0) {
+          caMois += caAttribue;
+          debugClients.push({
+            nom: c.nom,
+            prenom: c.prenom,
+            prixCentrale: c.prixCentrale,
+            emailCommercial: c.emailCommercial,
+            emailCommercialAcco: c.emailCommercialAcco,
+            emailCom: c.emailCom,
+            caAttribue,
+            emailCommercialCourant: com.email
+          });
         }
       }
     });
-    // Toujours utiliser le nom/prénom/email réel
     const displayName = com.nom && com.prenom ? `${com.nom} ${com.prenom}` : (com.nom || com.prenom || com.email);
     return {
       ...com,
       caMois,
-      displayName
+      displayName,
+      debugClients
     };
   });
   const topCommerciauxMois = statsMois.filter(com => com.caMois > 0).sort((a, b) => b.caMois - a.caMois);
@@ -385,6 +403,25 @@ function PerformanceSection({ clients, commerciaux }) {
         />
         </div>
         {/* Podium du mois */}
+              {/* DEBUG: Affichage des ventes attribuées à chaque commercial */}
+              <details style={{marginBottom: 20, background: '#f8fafc', padding: 10, borderRadius: 8, color: '#334155'}}>
+                <summary style={{cursor: 'pointer', fontWeight: 600}}>Debug CA attribué par commercial</summary>
+                <div style={{fontSize: 14}}>
+                  {statsMois.map(com => (
+                    <div key={com.email} style={{marginBottom:16}}>
+                      <b>{com.displayName} ({com.email})</b>
+                      <ul>
+                        {com.debugClients.length === 0 ? <li>Aucune vente attribuée</li> : com.debugClients.map((c, idx) => (
+                          <li key={idx}>
+                            <span style={{color:'#2563eb'}}>Prix: <b>{c.prixCentrale}</b> | CA attribué: <b>{c.caAttribue}</b></span><br/>
+                            <span style={{color:'#64748b'}}>emailCommercial: <b>{c.emailCommercial || '-'}</b> | emailCommercialAcco: <b>{c.emailCommercialAcco || '-'}</b> | emailCom: <b>{c.emailCom || '-'}</b> | commercial courant: <b>{c.emailCommercialCourant}</b></span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ))}
+                </div>
+              </details>
         <div style={{ display: 'flex', gap: 28, marginBottom: 32, marginTop: 24, justifyContent: 'center', alignItems: 'flex-end' }}>
           {podiumMois.length === 0 ? (
             <div style={{ color: '#64748b', fontSize: 18, textAlign: 'center', width: '100%' }}>
