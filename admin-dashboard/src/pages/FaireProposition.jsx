@@ -7,293 +7,37 @@ import { getFirestore, getDocs, collection, addDoc } from 'firebase/firestore';
 import { getApp } from 'firebase/app';
 import * as XLSX from 'xlsx';
 
-// Fonction utilitaire pour générer le HTML des tags/jauges (pour mail et aperçu)
-function getTagsJaugesHtml(etude, etudeData) {
-  // Tags
-  const tags = [
-    {
-      label: 'Puissance & Stockage',
-      value: (() => {
-        let puissance = '-';
-        let stockage = '-';
-        if (etude.kit) {
-          const kitMatch = String(etude.kit).match(/(\d+)KWh-(\d+)/);
-          if (kitMatch) {
-            puissance = kitMatch[1] + ' KWh';
-            stockage =
-              kitMatch[2] === '1'
-                ? '5 KWh'
-                : kitMatch[2] === '2'
-                ? '10 KWh'
-                : '-';
-          }
-        }
-        return puissance + (stockage !== '-' ? ' / ' + stockage : '');
-      })(),
-      color: 'linear-gradient(90deg,#0ea5e9 60%,#38bdf8 100%)',
-      icon: '🔋',
-      valueColor: '#fff',
-      shadow: '0 2px 12px #0ea5e933',
-    },
-    {
-      label: 'Prime EDF versée',
-      value: (() => {
-        const primeValue = Number(etude.primeEDF || etude.prime || 0);
-        return primeValue ? primeValue.toLocaleString() + ' €' : '-';
-      })(),
-      color: 'linear-gradient(90deg,#FFB5DA 60%,#FF7ED4 100%)',
-      icon: '🎁',
-      valueColor: '#fff',
-      shadow: '0 2px 12px #f59e4233',
-    },
-    {
-      label: 'Production annuelle',
-      value: etudeData.production,
-      color: 'linear-gradient(90deg,#FFB5DA 60%,#FF7ED4 100%)',
-      icon: '⚡',
-      valueColor: '#fff',
-      shadow: '0 2px 12px #FFB5DA33',
-    },
-    {
-      label: 'Rentable en ',
-      value: etude.anneeRentable || etudeData.anneeRentabilite,
-      color: 'linear-gradient(90deg,#FFB5DA 60%,#FF7ED4 100%)',
-      icon: '⏳',
-      valueColor: '#fff',
-      shadow: '0 2px 12px #FFB5DA33',
-    },
-    // ...existing code...
-  ];
-  // Jauges
-  const productionEstimeeNum = Number(etude.prodMoyenneKwh || 0);
-  const consoAnnuelleNum = Number(etude.conso || etude.consoAnnuelle || 0);
-  const consoCouverteNum = consoAnnuelleNum
-    ? Number((consoAnnuelleNum * 0.95).toFixed(0))
-    : 0;
-  const jauges = [
-    {
-      icon: '🏠',
-      percent:
-        productionEstimeeNum > 0
-          ? ((consoCouverteNum / productionEstimeeNum) * 100).toFixed(1)
-          : '0.0',
-      label: 'utilisé pour la maison',
-      kwh: consoCouverteNum,
-      euros: consoCouverteNum
-        ? `${(consoCouverteNum * 0.25).toFixed(2)} €`
-        : '0.00 €',
-      color: 'linear-gradient(90deg,#4ade80 60%,#60a5fa 100%)',
-      textColor: '#fff',
-      valueColor: '#16a34a',
-    },
-    {
-      icon: '💸',
-      percent:
-        productionEstimeeNum > 0
-          ? (
-              ((productionEstimeeNum - consoCouverteNum) /
-                productionEstimeeNum) *
-              100
-            ).toFixed(1)
-          : '0.0',
-      label: 'en surplus revendu',
-      kwh:
-        productionEstimeeNum && consoCouverteNum
-          ? (productionEstimeeNum - consoCouverteNum).toFixed(2)
-          : '0.00',
-      euros: (() => {
-        const surplusNum =
-          productionEstimeeNum && consoCouverteNum
-            ? productionEstimeeNum - consoCouverteNum
-            : 0;
-        return surplusNum ? `${(surplusNum * 0.1767).toFixed(2)} €` : '0.00 €';
-      })(),
-      color: 'linear-gradient(90deg,#fbbf24 60%,#f87171 100%)',
-      textColor: '#fff',
-      valueColor: '#bfa100',
-    },
-  ];
-  // Génération du HTML inline pour tags et jauges
-  let html =
-    '<div style="display:flex;flex-wrap:wrap;gap:12px;margin-bottom:18px;align-items:flex-start">';
-  tags.forEach((tag) => {
-    html += `<span style="background:${tag.color};color:#fff;border-radius:16px;padding:14px 28px;font-weight:500;font-size:16px;box-shadow:${tag.shadow};display:inline-flex;align-items:center;margin-right:10px;margin-bottom:8px;border:2px solid #fff2;">`;
-    html += `<span style="font-size:28px;margin-right:14px;">${tag.icon}</span>`;
-    html += `<span style="font-size:15px;opacity:0.85;">${tag.label}</span>`;
-    html += `<span style="font-size:22px;font-weight:700;margin-left:14px;color:${tag.valueColor};text-shadow:0 2px 8px #0002;">${tag.value}</span>`;
-    html += `</span>`;
-  });
-  jauges.forEach((jauge, idx) => {
-    html += `<div style="display:flex;align-items:center;background:${jauge.color};border-radius:24px;padding:8px 24px;font-weight:700;font-size:20px;color:${jauge.textColor};box-shadow:0 2px 8px #0002;margin-right:8px;min-width:260px;margin-top:2px;">`;
-    html += `<span style="font-size:26px;margin-right:10px;">${jauge.icon}</span>`;
-    html += `<span style="margin-right:10px;">${Number(jauge.percent).toFixed(
-      1
-    )}% ${jauge.label}</span>`;
-    html += `<span style="font-size:15px;font-weight:400;margin-left:16px;color:#e0e7ff;text-align:right;">${
-      jauge.kwh
-    } kWh<br /><span style="color:#fff;font-weight:600;">${jauge.euros} ${
-      idx === 0 ? '€ économisés' : '€ gagnés'
-    }</span></span>`;
-    html += `</div>`;
-  });
-  html += '</div>';
-  return html;
+// Fonction utilitaire pour extraire la puissance depuis le champ kit
+function getPuissanceStockage(etude) {
+  if (!etude || !etude.kit) return '-';
+  const kitMatch = String(etude.kit).match(/(\d+)KWh-(\d+)/);
+  if (kitMatch) {
+    return kitMatch[1] + ' KWh';
+  }
+  return '-';
 }
 
-// Fonction utilitaire pour générer les tags visuels (données + design)
-function getVisualTags(etude) {
-  // Calculs pour tags
-  const primeValueNum = Number(etude.primeEDF || etude.prime || 0);
-  let anneeRentable = etude.anneeRentable || null;
-  let gainTotal20ans =
-    etude &&
-    typeof etude.totalCumul !== 'undefined' &&
-    etude.totalCumul !== null
-      ? `${Number(etude.totalCumul).toLocaleString()} €`
-      : '-';
-  return [
-    {
-      label: 'Production annuelle',
-      value: etude.prodMoyenneKwh ? etude.prodMoyenneKwh + ' kWh/an' : '-',
-      color: 'linear-gradient(90deg,#2563eb 60%,#60a5fa 100%)',
-      icon: '⚡',
-      valueColor: '#fff',
-      shadow: '0 2px 12px #2563eb33',
-    },
-    {
-      label: 'Année de rentabilité',
-      value: anneeRentable || etude.amortissement || '-',
-      color: 'linear-gradient(90deg,#bfa100 60%,#fbbf24 100%)',
-      icon: '⏳',
-      valueColor: '#fff',
-      shadow: '0 2px 12px #bfa10033',
-    },
-    {
-      label: 'Gain total sur 20 ans',
-      value: gainTotal20ans || '-',
-      color: 'linear-gradient(90deg,#16a34a 60%,#4ade80 100%)',
-      icon: '💰',
-      valueColor: '#fff',
-      shadow: '0 2px 12px #16a34a33',
-    },
-    {
-      label: 'Prime EDF versée',
-      value: primeValueNum ? primeValueNum.toLocaleString() + ' €' : '-',
-      color: 'linear-gradient(90deg,#f59e42 60%,#fbbf24 100%)',
-      icon: '🎁',
-      valueColor: '#fff',
-      shadow: '0 2px 12px #f59e4233',
-    },
-    {
-      label: 'Puissance & Stockage',
-      value: (() => {
-        let puissance = '-';
-        let stockage = '-';
-        if (etude.kit) {
-          const kitMatch = String(etude.kit).match(/(\d+)KWh-(\d+)/);
-          if (kitMatch) {
-            puissance = kitMatch[1] + ' KWh';
-            stockage =
-              kitMatch[2] === '1'
-                ? '5 KWh'
-                : kitMatch[2] === '2'
-                ? '10 KWh'
-                : '-';
-          }
-        }
-        return puissance + (stockage !== '-' ? ' / ' + stockage : '');
-      })(),
-      color: 'linear-gradient(90deg,#0ea5e9 60%,#38bdf8 100%)',
-      icon: '🔋',
-      valueColor: '#fff',
-      shadow: '0 2px 12px #0ea5e933',
-    },
-  ];
+// Fonction utilitaire pour générer les tags/jauges (placeholder)
+function getTagsJaugesHtml() {
+  return '';
 }
+
+// Fonction utilitaire pour extraire les données d'étude (simplifiée)
+function getEtudeData(etude) {
+  if (!etude) return {};
+  const puissance = getPuissanceStockage(etude);
+  const production = etude.prodMoyenneKwh ? etude.prodMoyenneKwh + ' kWh/an' : '-';
+  const gainPremiereAnnee = etude.gainAnnuel ? etude.gainAnnuel + ' €' : '-';
+  const anneeRentabilite = etude.anneeRentable || etude.amortissement || '-';
+  return { puissance, production, gainPremiereAnnee, anneeRentabilite };
+}
+
+// ...existing code...
 
 // Page "Faire une proposition" pour importer et gérer des devis
 const FaireProposition = () => {
-  // Refs pour les graphiques (pour export PNG)
-  const chartKwhRoiRef = React.createRef();
-  const chartRentabiliteBarRef = React.createRef();
-  const chartBreakEvenRef = React.createRef();
-  // --- Données visuelles pour bandeau et jauge ---
-  const getEtudeData = () => {
-    const client = clients.find((c) => c.id === selectedClient);
-    let etude = null;
-    if (
-      client?.Etude &&
-      Array.isArray(client.Etude) &&
-      client.Etude.length > 0
-    ) {
-      // Sélectionne l'étude selon le modePaiement si plusieurs études
-      const etudes = client.Etude;
-      // Priorité à l'étude avec modePaiement 'comptant' si existante
-      etude = etudes.find((e) => e.modePaiement === 'comptant') || etudes[0];
-    } else if (client?.etudePerso) {
-      etude = client.etudePerso;
-    } else {
-      etude = {};
-    }
-    // Extraction des valeurs
-    const puissance = etude.kit
-      ? String(etude.kit).replace(/[^0-9]/g, '') + ' kWc'
-      : '-';
-    const production = etude.prodMoyenneKwh
-      ? etude.prodMoyenneKwh + ' kWh/an'
-      : '-';
-    const autoconsommation = etude.autoconsommation
-      ? etude.autoconsommation + ' %'
-      : '-';
-    const gainPremiereAnnee = etude.gainAnnuel ? etude.gainAnnuel + ' €' : '-';
-    const anneeRentabilite = etude.anneeRentable || etude.amortissement || '-';
-    // Pour jauge
-    const consoClientNum = Number(etude.conso || etude.consoAnnuelle || 0);
-    const productionEstimeeNum = Number(etude.prodMoyenneKwh || 0);
-    // Harmonisation : conso couverte = 95% de la conso annuelle
-    const consoCouverteNum = consoClientNum
-      ? Number((consoClientNum * 0.95).toFixed(0))
-      : 0;
-    // Surplus = Production estimée - Conso couverte (arrondi 2 décimales)
-    const surplusNum =
-      productionEstimeeNum && consoCouverteNum
-        ? Number((productionEstimeeNum - consoCouverteNum).toFixed(2))
-        : 0;
-    // Revente du surplus = Surplus × 0,1767 (arrondi 2 décimales)
-    const reventeSurplus = surplusNum
-      ? Number((surplusNum * 0.1767).toFixed(2))
-      : 0;
-    // Pourcentage utilisé pour la maison = conso couverte / production estimée
-    const pourcentageUtilisation =
-      productionEstimeeNum > 0
-        ? ((consoCouverteNum / productionEstimeeNum) * 100).toFixed(1)
-        : 0;
-    // Surplus = le reste
-    const pourcentageSurplus =
-      productionEstimeeNum > 0
-        ? (
-            ((productionEstimeeNum - consoCouverteNum) / productionEstimeeNum) *
-            100
-          ).toFixed(1)
-        : 0;
-    const economieEDF = consoCouverteNum
-      ? Number((consoCouverteNum * 0.25).toFixed(2))
-      : 0;
-    return {
-      puissance,
-      production,
-      autoconsommation,
-      gainPremiereAnnee,
-      anneeRentabilite,
-      consoCouverteNum,
-      productionNum: productionEstimeeNum,
-      economieEDF,
-      surplusNum,
-      reventeSurplus,
-      pourcentageUtilisation,
-      pourcentageSurplus,
-    };
-  };
+  // Déclarations de hooks d'état
+  const [selectedEtudesIdx, setSelectedEtudesIdx] = useState([]);
   const [devisFiles, setDevisFiles] = useState([]);
   const [selectedClient, setSelectedClient] = useState('');
   const [searchClient, setSearchClient] = useState('');
@@ -306,17 +50,39 @@ const FaireProposition = () => {
   const [pdfPreview, setPdfPreview] = useState(null);
   const [user, setUser] = useState(null);
   const [selectedPdfId, setSelectedPdfId] = useState('');
-  const [mailFields, setMailFields] = useState({
-    prix: '',
-    date: '',
-    options: '',
-  });
+  const [mailFields, setMailFields] = useState({ prix: '', date: '', options: '' });
   const [scriptMail, setScriptMail] = useState(
     `Monsieur et Madame « [NomClient] »,\nSuite à notre échange, je vous adresse le récapitulatif de votre projet d’installation photovoltaïque.\n\n📌 Contexte\nConsommation actuelle : « [ConsoAnnuelle] », soit environ « [ConsoPrix] ».\nObjectifs : autonomie énergétique à [ObjectifAutonomie] et économies durables.\n\n⚡ Projet proposé\nCentrale photovoltaïque « [PuissanceCentrale] » avec « [Stockage] » de stockage.\nSurface de toiture à exploiter, environ « [SurfaceToiture] »\nProduction estimée : « [ProductionEstimee] ».\nPrix de base : « [PrixBase] ».\nPrime à percevoir (12–18 mois après validation) : « [Prime] ».\nCoût net après prime : [PrixBase] – [Prime] = « [PrixNet] »\n\n✅ Garanties\nModules photovoltaïques AE Solar : 30 ans (matériel + production).\nOnduleurs Solis : 15 ans.\nBatterie BSL : 15 ans.\n\n📑 Démarches administratives (prises en charges par Botaik)\nDéclaration préalable en mairie.\nDemande de raccordement auprès d’EDF/Enedis.\nSignature du contrat d’obligation d’achat (EDF OA).\nValidation technique (Consuel).\nVérification technique de la toiture et adaptation éventuelle de l’armature.\n\n🤝 Notre expertise et accompagnement\nPlus de 200 clients accompagnés avec succès dans leurs projets solaires.\nPartenaire Outenergie : 15 années d’expérience en pose, certifié QualiPV et RGE, permettant de garantir les normes de qualité et de vous faire bénéficier des primes EDF.\n👉 https://www.outenergiephotovoltaique.com/\nBotaik se distingue par sa transparence et son suivi, en vous accompagnant pendant toute la durée de vie de votre projet.\n\nMonsieur et Madame « [NomClient] », ce projet vous permettra de réduire vos factures EDF de manière significative, d’accéder à une autonomie énergétique de [ObjectifAutonomie] et de bénéficier d’un retour sur investissement rapide et durable.\nNous restons disponibles pour toute précision et pour avancer à vos côtés sur la mise en place du projet.\nBien cordialement,`
   );
   const [includeTableInMail, setIncludeTableInMail] = useState(false);
   const [showFullPreview, setShowFullPreview] = useState(false);
   const [smtpPassword, setSmtpPassword] = useState('');
+  // Refs pour les graphiques (pour export PNG)
+  const chartKwhRoiRef = React.createRef();
+  const chartRentabiliteBarRef = React.createRef();
+  const chartBreakEvenRef = React.createRef();
+
+  // Réinitialise l'étude sélectionnée à chaque changement de client ou de ses études
+  useEffect(() => {
+    const client = clients.find((c) => c.id === selectedClient);
+    let etudes = [];
+    if (client?.etudes && Array.isArray(client.etudes) && client.etudes.length > 0) {
+      etudes = client.etudes;
+    } else if (client?.etudePerso) {
+      etudes = [client.etudePerso];
+    }
+    if (etudes.length > 0) {
+      setSelectedEtudesIdx([0]);
+    } else {
+      setSelectedEtudesIdx([]);
+    }
+  }, [selectedClient, clients]);
+
+
+  // Génère automatiquement le mail récapitulatif à chaque changement d'étude sélectionnée, client, etc.
+  useEffect(() => {
+    handleGenerateMail();
+  }, [selectedEtudesIdx, selectedClient, clients, scriptMail, includeTableInMail]);
 
   // Récupère l'utilisateur connecté
   useEffect(() => {
@@ -421,17 +187,24 @@ const FaireProposition = () => {
   // Mail récapitulatif avec champs modifiables
   const handleGenerateMail = useCallback(() => {
     const client = clients.find((c) => c.id === selectedClient);
-    let etude = null;
+    let etudes = [];
     if (
-      client?.Etude &&
-      Array.isArray(client.Etude) &&
-      client.Etude.length > 0
+      client?.etudes &&
+      Array.isArray(client.etudes) &&
+      client.etudes.length > 0
     ) {
-      etude = client.Etude[0];
+      etudes = client.etudes;
     } else if (client?.etudePerso) {
-      etude = client.etudePerso;
-    } else {
-      etude = {};
+      etudes = [client.etudePerso];
+    }
+    // Sécurise l'accès à l'étude sélectionnée
+    let etude = {};
+    if (etudes.length > 0) {
+      if (selectedEtudesIdx.length > 0 && etudes[selectedEtudesIdx[0]]) {
+        etude = etudes[selectedEtudesIdx[0]];
+      } else {
+        etude = etudes[0];
+      }
     }
     const primeValue = etude.primeEDF || etude.prime || '';
     const nomClient =
@@ -441,8 +214,20 @@ const FaireProposition = () => {
     // Objectif autonomie toujours 95%
     const objectifAutonomie = '<b>95%</b>';
     // Extraction automatique puissance centrale et stockage depuis le champ kit
-    let puissanceCentrale = '-';
+    let puissanceCentrale = getPuissanceStockage(etude);
     let stockage = '-';
+    if (etude && etude.kit) {
+      const kitMatch = String(etude.kit).match(/(\d+)KWh-(\d+)/);
+      if (kitMatch) {
+        if (kitMatch[2] === '1') {
+          stockage = '5 KWh';
+        } else if (kitMatch[2] === '2') {
+          stockage = '10 KWh';
+        } else if (kitMatch[2] === '3') {
+          stockage = '15 KWh';
+        }
+      }
+    }
     let surfaceToiture = '-';
     let productionEstimee = '-';
     let prixBase = '-';
@@ -634,7 +419,13 @@ const FaireProposition = () => {
     // Suppression des guillemets autour des données dynamiques dans le mail
     mail = mail.replace(/«\s*([^»]+)\s*»/g, '$1');
     setMailContent(mail);
-  }, [selectedClient, clients, scriptMail, includeTableInMail]);
+  }, [
+    selectedClient,
+    clients,
+    scriptMail,
+    includeTableInMail,
+    selectedEtudesIdx,
+  ]);
 
   // Affichage des PDF enregistrés pour l'utilisateur (tous devis PDF)
   useEffect(() => {
@@ -698,11 +489,21 @@ const FaireProposition = () => {
     const client = clients.find((c) => c.id === selectedClient);
     let etude = null;
     if (
+      client?.etudes &&
+      Array.isArray(client.etudes) &&
+      client.etudes.length > 0
+    ) {
+      etude =
+        client.etudes.find((e) => e.modePaiement === 'comptant') ||
+        client.etudes[0];
+    } else if (
       client?.Etude &&
       Array.isArray(client.Etude) &&
       client.Etude.length > 0
     ) {
-      etude = client.Etude[0];
+      etude =
+        client.Etude.find((e) => e.modePaiement === 'comptant') ||
+        client.Etude[0];
     } else if (client?.etudePerso) {
       etude = client.etudePerso;
     } else {
@@ -737,6 +538,8 @@ const FaireProposition = () => {
             ? '<b>5KWh</b>'
             : kitMatch[2] === '2'
             ? '<b>10KWh</b>'
+            : kitMatch[2] === '3'
+            ? '<b>15KWh</b>'
             : '<b>-</b>';
         surfaceToiture =
           kitMatch[1] === '3'
@@ -897,18 +700,29 @@ const FaireProposition = () => {
       selectedEtudesIdx.length > 0
         ? selectedEtudesIdx.map((idx) => etudes[idx])
         : [etudes[0]];
-    if (includeTableInMail && Array.isArray(selectedEtudes) && selectedEtudes.length > 0) {
+    if (
+      includeTableInMail &&
+      Array.isArray(selectedEtudes) &&
+      selectedEtudes.length > 0
+    ) {
       selectedEtudes.forEach((etude, idx) => {
         if (etude && etude.tableauRentabiliteHtml) {
           mail += '<br />' + etude.tableauRentabiliteHtml;
           // Ajout des images des graphiques pour chaque étude
           // On suppose que chaque graphique a un ref unique par étude (ex: chartKwhRoiRef[idx])
           // Si ce n'est pas le cas, on récupère le canvas du DOM par une classe ou un id unique
-          const roiCanvas = document.querySelector(`#chartKwhRoi-${idx} canvas`);
-          const barCanvas = document.querySelector(`#chartRentabiliteBar-${idx} canvas`);
-          const breakEvenCanvas = document.querySelector(`#chartBreakEven-${idx} canvas`);
+          const roiCanvas = document.querySelector(
+            `#chartKwhRoi-${idx} canvas`
+          );
+          const barCanvas = document.querySelector(
+            `#chartRentabiliteBar-${idx} canvas`
+          );
+          const breakEvenCanvas = document.querySelector(
+            `#chartBreakEven-${idx} canvas`
+          );
           // Mise en page : 2 graphiques côte à côte, le 3e en dessous et plus grand
-          let graphRow = '<div style="display:flex;gap:24px;flex-wrap:wrap;justify-content:center;margin:24px 0;">';
+          let graphRow =
+            '<div style="display:flex;gap:24px;flex-wrap:wrap;justify-content:center;margin:24px 0;">';
           if (roiCanvas) {
             graphRow += `<div style="flex:1 1 600px;max-width:700px;"><img src="${roiCanvas.toDataURL()}" style="width:100%;min-width:400px;max-width:700px;border-radius:18px;box-shadow:0 4px 24px #0003;" alt="Graphique ROI/kWh" /></div>`;
           }
@@ -1386,8 +1200,7 @@ const FaireProposition = () => {
     }
   };
 
-  // Ajout d'un état pour les études sélectionnées (multi-sélection)
-  const [selectedEtudesIdx, setSelectedEtudesIdx] = React.useState([]);
+
 
   return (
     <div style={{ padding: 32 }}>
@@ -1756,13 +1569,19 @@ const FaireProposition = () => {
                             }
                           />
                         </div>
-                        <div id={`chartRentabiliteBar-${i}`} style={{ marginTop: 120 }}>
+                        <div
+                          id={`chartRentabiliteBar-${i}`}
+                          style={{ marginTop: 120 }}
+                        >
                           <ChartRentabiliteBar
                             ref={chartRentabiliteBarRef}
                             rentabilite={rentabiliteArr}
                           />
                         </div>
-                        <div id={`chartBreakEven-${i}`} style={{ marginTop: 120 }}>
+                        <div
+                          id={`chartBreakEven-${i}`}
+                          style={{ marginTop: 120 }}
+                        >
                           <ChartBreakEven
                             ref={chartBreakEvenRef}
                             rentabilite={rentabiliteArr}
@@ -1773,9 +1592,12 @@ const FaireProposition = () => {
                       </>
                     ) : (
                       <div style={{ color: '#ef4444', marginBottom: 8 }}>
-                        Erreur : cette étude n’a pas de données de rentabilité ou le format est incorrect.<br />
+                        Erreur : cette étude n’a pas de données de rentabilité
+                        ou le format est incorrect.
+                        <br />
                         <span style={{ fontSize: 13, color: '#b91c1c' }}>
-                          (Vérifiez que la propriété <b>rentabilite</b> existe et est un tableau)
+                          (Vérifiez que la propriété <b>rentabilite</b> existe
+                          et est un tableau)
                         </span>
                       </div>
                     )}

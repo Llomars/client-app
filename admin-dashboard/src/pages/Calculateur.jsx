@@ -56,6 +56,7 @@ function Calculateur() {
   // Champs admin pour prime par puissance
   const [prime3Admin, setPrime3Admin] = useState(null);
   const [prime6Admin, setPrime6Admin] = useState(null);
+  const [prime7_5Admin, setPrime7_5Admin] = useState(null);
   const [prime9Admin, setPrime9Admin] = useState(null);
   const [tarifRachatAdmin, setTarifRachatAdmin] = useState(null);
 
@@ -72,6 +73,7 @@ function Calculateur() {
           const data = snap.data();
           setPrime3Admin(data.prime3 ?? null);
           setPrime6Admin(data.prime6 ?? null);
+          setPrime7_5Admin(data.prime7_5 ?? null);
           setPrime9Admin(data.prime9 ?? null);
           setTarifRachatAdmin(data.tarifRachat ?? null);
         }
@@ -89,6 +91,7 @@ function Calculateur() {
         setDoc(ref, {
           prime3: prime3Admin,
           prime6: prime6Admin,
+          prime7_5: prime7_5Admin,
           prime9: prime9Admin,
           tarifRachat: tarifRachatAdmin,
         })
@@ -1018,6 +1021,44 @@ function Calculateur() {
   ];
   // Utilise la prime admin selon le kit
   const kits = [
+    {
+      label: '7,5 KWh 0',
+      value: '7.5KWh-0',
+      prix: 11500,
+      prime: prime7_5Admin !== null ? prime7_5Admin : null,
+      composition: [
+        'Panneaux de 500W x 15',
+        'Batterie de 7,5Kwh',
+        'Onduleur de 6Kwh',
+        'Boitier BMS',
+        'Système Monitoring',
+        'Rails et visseries',
+        'Clé wifi',
+        'Câbles solaires',
+        'Raccordement',
+        'Déclaration Préalable des travaux',
+        'Installation',
+      ],
+    },
+    {
+      label: '7,5 KWh 2',
+      value: '7.5KWh-2',
+      prix: 17000,
+      prime: prime7_5Admin !== null ? prime7_5Admin : null,
+      composition: [
+        'Panneaux de 500W x 15',
+        'Batterie de 15Kwh',
+        'Onduleur de 6Kwh',
+        'Boitier BMS',
+        'Système Monitoring',
+        'Rails et visseries',
+        'Clé wifi',
+        'Câbles solaires',
+        'Raccordement',
+        'Déclaration Préalable des travaux',
+        'Installation',
+      ],
+    },
     {
       label: '6 KWh 3',
       value: '6KWh-3',
@@ -2531,9 +2572,12 @@ function Calculateur() {
                   capaciteBatterie,
                   stockage: capaciteBatterie || null,
                   rentabilite: Array.isArray(rentabilite) ? rentabilite : [],
-                  tableauRentabilite: Array.isArray(rentabilite) ? rentabilite : [], // Tableau brut
-                  tableauRentabiliteHtml:
-                    getTableauRentabiliteHtml(Array.isArray(rentabilite) ? rentabilite : []), // Tableau HTML complet
+                  tableauRentabilite: Array.isArray(rentabilite)
+                    ? rentabilite
+                    : [], // Tableau brut
+                  tableauRentabiliteHtml: getTableauRentabiliteHtml(
+                    Array.isArray(rentabilite) ? rentabilite : []
+                  ), // Tableau HTML complet
                   totalDiff,
                   nbAnneesRentable,
                   anneeRentable: anneeRentable?.annee || null,
@@ -2826,6 +2870,26 @@ function Calculateur() {
               value={prime6Admin ?? ''}
               onChange={(e) =>
                 setPrime6Admin(e.target.value ? Number(e.target.value) : null)
+              }
+              min={0}
+              step={1}
+              style={{
+                marginBottom: 12,
+                width: 120,
+                fontSize: 16,
+                padding: 4,
+                borderRadius: 4,
+                border: '1px solid #c7d2fe',
+              }}
+            />
+            <label style={{ fontWeight: 600, color: '#0e7490', fontSize: 15 }}>
+              Prime 7,5 kWc (€)
+            </label>
+            <input
+              type="number"
+              value={prime7_5Admin ?? ''}
+              onChange={(e) =>
+                setPrime7_5Admin(e.target.value ? Number(e.target.value) : null)
               }
               min={0}
               step={1}
