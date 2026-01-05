@@ -26,7 +26,9 @@ function getTagsJaugesHtml() {
 function getEtudeData(etude) {
   if (!etude) return {};
   const puissance = getPuissanceStockage(etude);
-  const production = etude.prodMoyenneKwh ? etude.prodMoyenneKwh + ' kWh/an' : '-';
+  const production = etude.prodMoyenneKwh
+    ? etude.prodMoyenneKwh + ' kWh/an'
+    : '-';
   const gainPremiereAnnee = etude.gainAnnuel ? etude.gainAnnuel + ' €' : '-';
   const anneeRentabilite = etude.anneeRentable || etude.amortissement || '-';
   return { puissance, production, gainPremiereAnnee, anneeRentabilite };
@@ -50,7 +52,11 @@ const FaireProposition = () => {
   const [pdfPreview, setPdfPreview] = useState(null);
   const [user, setUser] = useState(null);
   const [selectedPdfId, setSelectedPdfId] = useState('');
-  const [mailFields, setMailFields] = useState({ prix: '', date: '', options: '' });
+  const [mailFields, setMailFields] = useState({
+    prix: '',
+    date: '',
+    options: '',
+  });
   const [scriptMail, setScriptMail] = useState(
     `Monsieur et Madame « [NomClient] »,\nSuite à notre échange, je vous adresse le récapitulatif de votre projet d’installation photovoltaïque.\n\n📌 Contexte\nConsommation actuelle : « [ConsoAnnuelle] », soit environ « [ConsoPrix] ».\nObjectifs : autonomie énergétique à [ObjectifAutonomie] et économies durables.\n\n⚡ Projet proposé\nCentrale photovoltaïque « [PuissanceCentrale] » avec « [Stockage] » de stockage.\nSurface de toiture à exploiter, environ « [SurfaceToiture] »\nProduction estimée : « [ProductionEstimee] ».\nPrix de base : « [PrixBase] ».\nPrime à percevoir (12–18 mois après validation) : « [Prime] ».\nCoût net après prime : [PrixBase] – [Prime] = « [PrixNet] »\n\n✅ Garanties\nModules photovoltaïques AE Solar : 30 ans (matériel + production).\nOnduleurs Solis : 15 ans.\nBatterie BSL : 15 ans.\n\n📑 Démarches administratives (prises en charges par Botaik)\nDéclaration préalable en mairie.\nDemande de raccordement auprès d’EDF/Enedis.\nSignature du contrat d’obligation d’achat (EDF OA).\nValidation technique (Consuel).\nVérification technique de la toiture et adaptation éventuelle de l’armature.\n\n🤝 Notre expertise et accompagnement\nPlus de 200 clients accompagnés avec succès dans leurs projets solaires.\nPartenaire Outenergie : 15 années d’expérience en pose, certifié QualiPV et RGE, permettant de garantir les normes de qualité et de vous faire bénéficier des primes EDF.\n👉 https://www.outenergiephotovoltaique.com/\nBotaik se distingue par sa transparence et son suivi, en vous accompagnant pendant toute la durée de vie de votre projet.\n\nMonsieur et Madame « [NomClient] », ce projet vous permettra de réduire vos factures EDF de manière significative, d’accéder à une autonomie énergétique de [ObjectifAutonomie] et de bénéficier d’un retour sur investissement rapide et durable.\nNous restons disponibles pour toute précision et pour avancer à vos côtés sur la mise en place du projet.\nBien cordialement,`
   );
@@ -66,7 +72,11 @@ const FaireProposition = () => {
   useEffect(() => {
     const client = clients.find((c) => c.id === selectedClient);
     let etudes = [];
-    if (client?.etudes && Array.isArray(client.etudes) && client.etudes.length > 0) {
+    if (
+      client?.etudes &&
+      Array.isArray(client.etudes) &&
+      client.etudes.length > 0
+    ) {
       etudes = client.etudes;
     } else if (client?.etudePerso) {
       etudes = [client.etudePerso];
@@ -78,11 +88,16 @@ const FaireProposition = () => {
     }
   }, [selectedClient, clients]);
 
-
   // Génère automatiquement le mail récapitulatif à chaque changement d'étude sélectionnée, client, etc.
   useEffect(() => {
     handleGenerateMail();
-  }, [selectedEtudesIdx, selectedClient, clients, scriptMail, includeTableInMail]);
+  }, [
+    selectedEtudesIdx,
+    selectedClient,
+    clients,
+    scriptMail,
+    includeTableInMail,
+  ]);
 
   // Récupère l'utilisateur connecté
   useEffect(() => {
@@ -1199,8 +1214,6 @@ const FaireProposition = () => {
       }
     }
   };
-
-
 
   return (
     <div style={{ padding: 32 }}>

@@ -1,9 +1,44 @@
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { collection, doc, getDocs, query, setDoc } from 'firebase/firestore';
 import React, { useEffect, useState } from 'react';
+import { createUserWithEmailAndPassword, getAuth } from 'firebase/auth';
+import { collection, doc, getDocs, query, setDoc } from 'firebase/firestore';
 import { auth, db } from '../firebaseConfig';
 import { useNavigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
+
+// Fonction utilitaire pour synchroniser tous les utilisateurs Auth dans Firestore
+async function syncAuthToFirestore(db, setError, setUsers) {
+  try {
+    // Utilisation de l'API REST Firebase Auth car listUsers n'est pas dispo côté client
+    const idToken = await getAuth().currentUser.getIdToken(/*forceRefresh=*/true);
+    const projectId = getAuth().app.options.projectId;
+    const response = await fetch(`https://identitytoolkit.googleapis.com/v1/projects/${projectId}/accounts:batchGet?key=API_KEY`, {
+      headers: { Authorization: `Bearer ${idToken}` }
+    });
+    const data = await response.json();
+    if (!data.users) throw new Error('Aucun utilisateur trouvé via Auth.');
+    // Récupère les utilisateurs déjà présents dans Firestore
+    const q = query(collection(db, 'users'));
+    const snapshot = await getDocs(q);
+    const firestoreUsers = snapshot.docs.map((doc) => doc.id);
+    // Pour chaque utilisateur Auth, ajoute-le dans Firestore s'il n'y est pas
+    for (const user of data.users) {
+      if (!firestoreUsers.includes(user.localId)) {
+        await setDoc(doc(db, 'users', user.localId), {
+          email: user.email,
+          role: 'commercial', // rôle par défaut, à ajuster si besoin
+          managerEmail: ''
+        }, { merge: true });
+      }
+    }
+    // Recharge la liste
+    const newSnapshot = await getDocs(query(collection(db, 'users')));
+    setUsers(newSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+    setError(null);
+    alert('Synchronisation terminée !');
+  } catch (err) {
+    setError(err.message);
+  }
+}
 
 export default function UserManagement() {
   const [email, setEmail] = useState('');
@@ -98,6 +133,14 @@ export default function UserManagement() {
     ) : userRole === 'admin' ? (
       <div style={{ padding: '20px' }}>
         <h1>Gestion des utilisateurs</h1>
+        <button
+          style={{ marginBottom: 20, background: '#6366f1', color: '#fff', border: 'none', borderRadius: 6, padding: '8px 18px', fontWeight: 600, cursor: 'pointer' }}
+          onClick={async () => {
+            await syncAuthToFirestore(db, setError, setUsers);
+          }}
+        >
+          Synchroniser les utilisateurs Auth → Firestore
+        </button>
         <div style={{ marginBottom: '20px' }}>
           <label>Email :</label>
           <input

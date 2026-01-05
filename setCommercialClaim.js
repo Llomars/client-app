@@ -5,8 +5,10 @@ admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
 });
 
-// Liste des emails à traiter
-const emails = [
+
+// Récupère les emails passés en argument, sinon utilise la liste par défaut
+const emails = process.argv.slice(2);
+const defaultEmails = [
   'clement.viart@botaik.com',
   'corentin.chaneyin@botaik.com',
   'eric.nadiama@botaik.com',
@@ -16,7 +18,8 @@ const emails = [
 ];
 
 async function setClaimsForAll() {
-  for (const email of emails) {
+  const toProcess = emails.length > 0 ? emails : defaultEmails;
+  for (const email of toProcess) {
     try {
       const userRecord = await admin.auth().getUserByEmail(email);
       await admin.auth().setCustomUserClaims(userRecord.uid, { role: 'commercial' });

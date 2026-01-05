@@ -23,11 +23,14 @@ const kits = [
   { label: '6 KWh 0', value: '6KWh-0', prix: 12000 },
   { label: '6 KWh 1', value: '6KWh-1', prix: 15000 },
   { label: '6 KWh 2', value: '6KWh-2', prix: 16000 },
+  { label: '6 KWh 3', value: '6KWh-3', prix: 17500 },
   { label: '9 KWh 0', value: '9KWh-0', prix: 16500 },
   { label: '9 KWh 1', value: '9KWh-1', prix: 22000 },
   { label: '9 KWh 2', value: '9KWh-2', prix: 24000 },
+  { label: '9 KWh 3', value: '9KWh-3', prix: 26000 },
   { label: '12 KWh 0', value: '12KWh-0', prix: 22000 },
   { label: '12 KWh 2', value: '12KWh-2', prix: 30000 },
+  { label: '12 KWh 3', value: '12KWh-3', prix: 32000 },
 ];
 
 export default function MesClients() {
