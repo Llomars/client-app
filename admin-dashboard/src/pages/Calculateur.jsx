@@ -62,13 +62,11 @@ function Calculateur() {
 
   // Charge les paramètres Firestore au démarrage
   useEffect(() => {
-    async function fetchParams() {
-      setLoadingParams(true);
-      try {
-        const ref = doc(db, 'config', PARAMS_DOC_ID);
-        const snap = await import('firebase/firestore').then(({ getDoc }) =>
-          getDoc(ref)
-        );
+    setLoadingParams(true);
+    let unsubscribe;
+    import('firebase/firestore').then(({ doc, onSnapshot }) => {
+      const ref = doc(db, 'config', PARAMS_DOC_ID);
+      unsubscribe = onSnapshot(ref, (snap) => {
         if (snap.exists()) {
           const data = snap.data();
           setPrime3Admin(data.prime3 ?? null);
@@ -77,10 +75,12 @@ function Calculateur() {
           setPrime9Admin(data.prime9 ?? null);
           setTarifRachatAdmin(data.tarifRachat ?? null);
         }
-      } catch (e) {}
-      setLoadingParams(false);
-    }
-    fetchParams();
+        setLoadingParams(false);
+      });
+    });
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   // Sauvegarde les paramètres Firestore (admin)
